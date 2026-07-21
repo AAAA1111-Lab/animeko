@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (C) 2024 OpenAni and contributors.
+  ~
+  ~ 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+  ~ Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+  ~
+  ~ https://github.com/open-ani/ani/blob/main/LICENSE
+  -->
+
+<resources>
+    <string name="app_name">Animeko</string>
+    <string name="service_torrent_engine_description">Animeko BT 引擎前台服务</string>
+    <string name="app_service_title_text_idle">没有下载任务</string>
+    <string name="app_service_title_text_working">正在下载 %1$d 个资源</string>
+    <string name="app_service_content_text">下载：%1$s，上传：%2$s</string>
+    <string name="app_service_stop_text">停止</string>
+</resources>

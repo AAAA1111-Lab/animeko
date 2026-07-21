@@ -1,0 +1,47 @@
+/*
+ * Copyright (C) 2024-2026 OpenAni and contributors.
+ *
+ * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+ * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+ *
+ * https://github.com/open-ani/ani/blob/main/LICENSE
+ */
+
+package me.him188.ani.app.data.persistent.database.dao
+
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
+import me.him188.ani.app.data.persistent.database.entity.EpisodeCommentEntity
+
+@Dao
+interface EpisodeCommentDao {
+    @Upsert
+    suspend fun upsert(item: EpisodeCommentEntity)
+
+    @Upsert
+    suspend fun upsert(item: List<EpisodeCommentEntity>)
+
+    @Query(
+        """
+        SELECT * FROM episode_comment 
+        WHERE episodeId = :episodeId
+          AND parentCommentId IS NULL
+        ORDER BY createdAt DESC
+        """,
+    )
+    suspend fun findTopLevelByEpisodeId(
+        episodeId: Long,
+    ): List<EpisodeCommentEntity>
+
+    @Query(
+        """
+        SELECT * FROM episode_comment
+        WHERE parentCommentId IN (:parentCommentIds)
+        ORDER BY createdAt ASC
+        """,
+    )
+    suspend fun findRepliesByParentCommentIds(
+        parentCommentIds: List<String>,
+    ): List<EpisodeCommentEntity>
+}

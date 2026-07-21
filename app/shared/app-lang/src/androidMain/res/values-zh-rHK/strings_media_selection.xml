@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (C) 2024-2025 OpenAni and contributors.
+  ~
+  ~ 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+  ~ Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+  ~
+  ~ https://github.com/open-ani/ani/blob/main/LICENSE
+  -->
+
+<!--@formatter:off-->
+
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="settings_media_preference_title">資源選擇偏好</string>
+    <string name="settings_media_preference_description">設置默認的資源選擇偏好。將同時影響線上播放和緩存</string>
+    <string name="settings_media_preference_override_notice">每部番劇在播放時的選擇將覆蓋這裡的設置</string>
+    <string name="settings_media_any">任意</string>
+    <string name="settings_media_none">無</string>
+    <string name="settings_media_subtitle_language">字幕語言</string>
+    <string name="settings_media_resolution">解析度</string>
+    <string name="settings_media_resolution_description">未選擇的解析度也會顯示，但不會自動選擇</string>
+    <string name="settings_media_alliance">字幕組</string>
+    <string name="settings_media_alliance_description">支持使用正則表達式，使用逗號分隔。越靠前的表達式的優先級越高\n\n示例: 桜都, 喵萌, 北宇治\n將優先採用桜都字幕組資源，否則採用喵萌，以此類推</string>
+    <string name="settings_media_advanced_settings">高級設置</string>
+    <string name="settings_media_advanced_settings_description">精調數據源自動選擇算法。一般不需要修改這些設置</string>
+    <string name="settings_media_source_web">線上 (推薦)</string>
+    <string name="settings_media_source_bt">BT</string>
+    <string name="settings_media_source_no_preference">無偏好</string>
+    <string name="settings_media_prefer_source_type">優先選擇數據源類型</string>
+    <string name="settings_media_prefer_source_type_description">線上數據源載入快但清晰度可能偏低，BT 數據源相反</string>
+    <string name="settings_media_fast_select_web">快速選擇線上數據源</string>
+    <string name="settings_media_fast_select_web_description">按數據源排序，當排序靠前的數據源查詢完成後立即選擇，不等待其他數據源查詢。可大幅減少等待時間</string>
+    <string name="settings_media_wait_time_none">不等待</string>
+    <string name="settings_media_wait_time_3s">3 秒後</string>
+    <string name="settings_media_wait_time_5s">5 秒後</string>
+    <string name="settings_media_wait_time_8s">8 秒後</string>
+    <string name="settings_media_wait_time_10s">10 秒後</string>
+    <string name="settings_media_wait_time_15s">15 秒後</string>
+    <string name="settings_media_wait_time_20s">20 秒後</string>
+    <string name="settings_media_wait_time_30s">30 秒後</string>
+    <string name="settings_media_wait_time_infinite">無限</string>
+    <string name="settings_media_video_link_resolve_timeout">影片連結解析逾時</string>
+    <string name="settings_media_video_link_resolve_timeout_description">播放線上影片來源時，解析最終可播放連結的最長等待時間。逾時後會更快判定失敗並切換或重試。建議設置 8-15 秒</string>
+    <string name="settings_media_max_wait_time">最長等待時間</string>
+    <string name="settings_media_max_wait_time_description">每次查詢的最長等待時間。在此時間結束時，將會從已經查詢到的數據源中根據你設置的偏好自動選擇數據源。如果等待時間太短，可能會忽略你的偏好設置；如果時間更長，可以更好地滿足你的偏好設置，但可能會導致每次開播很慢。建議設置 5–10 秒</string>
+    <string name="settings_media_show_disabled">顯示禁用的數據源</string>
+    <string name="settings_media_show_disabled_description">播放時，以灰色顯示在"數據源管理"設置中禁用的數據源，而不是隱藏。以便在偏好數據源中未找到資源時，可臨時啟用禁用的數據源</string>
+    <string name="settings_media_hide_no_subtitle">隱藏無字幕資源</string>
+    <string name="settings_media_hide_no_subtitle_description">可以過濾掉一些生肉資源，但也可能會過濾掉未識別到字幕類型的資源</string>
+    <string name="settings_media_hide_single_episode">完結一年後隱藏單集 BT 資源</string>
+    <string name="settings_media_hide_single_episode_description">在番劇完結一年後，單集資源通常會沒有速度</string>
+    <string name="settings_media_prefer_seasons">BT 資源優先選擇季度全集</string>
+    <string name="settings_media_prefer_seasons_description">季度全集資源通常更快，建議開啟</string>
+    <string name="settings_media_auto_enable_last">自動啟用上次臨時啟用選擇的數據源</string>
+    <string name="settings_media_auto_enable_last_description">如果在"數據源管理"設置中禁用了一個數據源，但在觀看一個番劇時使用了它，則下次播放此番劇時自動啟用這個數據源</string>
+    <string name="settings_media_auto_cache_none">當前設置: 不自動緩存</string>
+    <string name="settings_media_auto_cache_all">當前設置: 自動緩存全部未觀看劇集, </string>
+    <string name="settings_media_auto_cache_partial">當前設置: 自動緩存觀看進度之後的 %d 話, </string>
+    <string name="settings_media_auto_cache_space">預計佔用空間 %s/番劇</string>
+    <string name="settings_media_sort_tip">長按排序，優先選擇順序較高的項目。\n選中數量越少，查詢越快。</string>
+</resources>

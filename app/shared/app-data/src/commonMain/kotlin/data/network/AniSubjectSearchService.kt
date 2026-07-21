@@ -1,0 +1,131 @@
+/*
+ * Copyright (C) 2024-2026 OpenAni and contributors.
+ *
+ * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+ * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+ *
+ * https://github.com/open-ani/ani/blob/main/LICENSE
+ */
+
+package me.him188.ani.app.data.network
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import me.him188.ani.app.data.models.subject.PersonPosition
+import me.him188.ani.app.data.models.subject.RatingCounts
+import me.him188.ani.app.data.models.subject.RatingInfo
+import me.him188.ani.app.data.models.subject.SubjectCollectionStats
+import me.him188.ani.app.data.models.subject.SubjectInfo
+import me.him188.ani.app.data.models.subject.Tag
+import me.him188.ani.app.domain.mediasource.MediaListFilters
+import me.him188.ani.app.domain.search.SearchSort
+import me.him188.ani.app.domain.search.SubjectType
+import me.him188.ani.client.apis.SubjectsAniApi
+import me.him188.ani.client.models.AniNsfwFilter
+import me.him188.ani.client.models.AniSubjectSearch
+import me.him188.ani.client.models.AniSubjectSearchField
+import me.him188.ani.client.models.AniSubjectSearchSortBy
+import me.him188.ani.datasources.api.PackedDate
+import me.him188.ani.utils.coroutines.IO_
+import me.him188.ani.utils.ktor.ApiInvoker
+import kotlin.coroutines.CoroutineContext
+
+
+class AniSubjectSearchService(
+    private val subjectApi: ApiInvoker<SubjectsAniApi>,
+    private val ioDispatcher: CoroutineContext = Dispatchers.IO_,
+) {
+    suspend fun searchSubjects(
+        keyword: String,
+        offset: Int? = null,
+        limit: Int? = null,
+
+        sort: SearchSort = SearchSort.MATCH,
+        filters: SubjectSearchFilters? = null,
+        fields: List<SubjectSearchField>? = null,
+    ): List<BatchSubjectDetails> = withContext(ioDispatcher) {
+        val result = subjectApi.invoke {
+            searchSubjects(
+                q = keyword,
+                offset = offset,
+                limit = limit,
+                tags = filters?.tags,
+                airDates = filters?.airDates,
+                ratings = filters?.ratings,
+                ranks = filters?.ranks,
+                includeNsfw = when (filters?.nsfw) {
+                    true -> AniNsfwFilter.ONLY
+                    false -> AniNsfwFilter.EXCLUDE
+                    null -> AniNsfwFilter.INCLUDE
+                },
+                sortBy = when (sort) {
+                    SearchSort.MATCH -> AniSubjectSearchSortBy.RELEVANCE
+                    SearchSort.RANK -> AniSubjectSearchSortBy.RATING_DESC
+                    SearchSort.COLLECTION -> AniSubjectSearchSortBy.COLLECTION_DESC
+                    SearchSort.DATE -> AniSubjectSearchSortBy.AIR_DATE_DESC
+                },
+                fields = fields?.map { it.toAniField() },
+            )
+        }.body()
+
+        result.items.map { search -> search.toBatchSubjectDetails() }
+    }
+
+    companion object {
+        fun sanitizeKeyword(keyword: String): String {
+            return buildString(keyword.length) {
+                for (c in keyword) {
+                    if (MediaListFilters.charsToDeleteForSearch.contains(c.code)) {
+                        append(' ')
+                    } else {
+                        append(c)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun AniSubjectSearch.toBatchSubjectDetails(): BatchSubjectDetails {
+        return BatchSubjectDetails(
+            subjectInfo = SubjectInfo(
+                subjectId = this.id.toInt(),
+                subjectType = SubjectType.ANIME,
+                name = this.name,
+                nameCn = this.nameCn,
+                summary = this.summary,
+                nsfw = this.nsfw,
+                imageLarge = this.imageLarge,
+                totalEpisodes = this.mainEpisodeCount,
+                airDate = PackedDate.parseFromDate(this.airDate),
+                tags = this.tags.map { Tag(it.name, it.count) },
+                aliases = emptyList(),
+                ratingInfo = RatingInfo(this.rank ?: 0, this.ratingTotal, RatingCounts.Zero, this.score ?: ""),
+                collectionStats = SubjectCollectionStats.Zero,
+                completeDate = PackedDate.Invalid,
+
+                ),
+            mainEpisodeCount = this.mainEpisodeCount,
+            lightSubjectRelations = LightSubjectRelations(
+                lightRelatedPersonInfoList = this.lightRelatedPersonInfoList.map { pi ->
+                    LightRelatedPersonInfo(pi.name, PersonPosition(pi.position))
+                },
+                lightRelatedCharacterInfoList = emptyList(),
+            ),
+        )
+    }
+}
+
+private fun SubjectSearchField.toAniField(): AniSubjectSearchField = when (this) {
+    SubjectSearchField.NAME -> AniSubjectSearchField.NAME
+    SubjectSearchField.SUMMARY -> AniSubjectSearchField.SUMMARY
+    SubjectSearchField.IMAGE_LARGE -> AniSubjectSearchField.IMAGE_LARGE
+    SubjectSearchField.NSFW -> AniSubjectSearchField.NSFW
+    SubjectSearchField.AIR_DATE -> AniSubjectSearchField.AIR_DATE
+    SubjectSearchField.SCORE -> AniSubjectSearchField.SCORE
+    SubjectSearchField.RANK -> AniSubjectSearchField.RANK
+    SubjectSearchField.RATING_TOTAL -> AniSubjectSearchField.RATING_TOTAL
+    SubjectSearchField.FAVORITE -> AniSubjectSearchField.FAVORITE
+    SubjectSearchField.TAGS -> AniSubjectSearchField.TAGS
+    SubjectSearchField.MAIN_EPISODE_COUNT -> AniSubjectSearchField.MAIN_EPISODE_COUNT
+    SubjectSearchField.LIGHT_RELATED_PERSON_INFO -> AniSubjectSearchField.LIGHT_RELATED_PERSON_INFO
+}

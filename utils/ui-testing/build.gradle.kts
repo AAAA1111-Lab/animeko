@@ -1,0 +1,56 @@
+/*
+ * Copyright (C) 2024-2026 OpenAni and contributors.
+ *
+ * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+ * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+ *
+ * https://github.com/open-ani/ani/blob/main/LICENSE
+ */
+
+import org.gradle.api.tasks.testing.AbstractTestTask
+
+
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.kotlin.plugin.compose)
+    alias(libs.plugins.jetbrains.compose)
+
+    `ani-mpp-lib-targets`
+}
+
+kotlin {
+    androidLibrary {
+        namespace = "me.him188.ani.utils.ui.testing"
+    }
+    compilerOptions {
+        optIn.add("androidx.compose.ui.test.ExperimentalTestApi")
+    }
+    sourceSets.commonMain.dependencies {
+        api(projects.utils.platform)
+        api(projects.utils.testing)
+        api(projects.utils.io)
+        api(libs.kotlinx.io.core)
+        api(libs.kotlinx.coroutines.core)
+        api(libs.kotlinx.coroutines.test)
+        api(libs.compose.ui.test)
+        api(kotlin("test"))
+
+        api(libs.compose.runtime)
+        implementation(libs.compose.lifecycle.runtime.compose)
+        implementation(libs.compose.lifecycle.runtime)
+    }
+    sourceSets.desktopMain.dependencies {
+        runtimeOnly(libs.kotlinx.coroutines.swing)
+        api(compose.desktop.currentOs)
+    }
+    sourceSets.androidMain.dependencies {
+        runtimeOnly(libs.kotlinx.coroutines.android)
+    }
+}
+
+if (enableIos) {
+    tasks.named<AbstractTestTask>("iosSimulatorArm64Test") {
+        failOnNoDiscoveredTests = false
+    }
+}

@@ -1,0 +1,145 @@
+/*
+ * Copyright (C) 2024-2026 OpenAni and contributors.
+ *
+ * 此源代码的使用受 GNU AFFERO GENERAL PUBLIC LICENSE version 3 许可证的约束, 可以在以下链接找到该许可证.
+ * Use of this source code is governed by the GNU AGPLv3 license, which can be found at the following link.
+ *
+ * https://github.com/open-ani/ani/blob/main/LICENSE
+ */
+
+package me.him188.ani.app.ui.comment
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
+import me.him188.ani.app.ui.foundation.LocalPlatform
+import me.him188.ani.app.ui.foundation.interaction.nestedScrollWorkaround
+import me.him188.ani.app.ui.foundation.layout.ConnectedScrollState
+import me.him188.ani.app.ui.foundation.theme.stronglyWeaken
+import me.him188.ani.app.ui.foundation.thenNotNull
+import me.him188.ani.app.ui.foundation.widgets.PullToRefreshBox
+import me.him188.ani.app.ui.search.LoadErrorCard
+import me.him188.ani.app.ui.search.SearchResultLazyVerticalGrid
+import me.him188.ani.app.ui.search.isFinishedAndEmpty
+import me.him188.ani.app.ui.search.isLoadingFirstPageOrRefreshing
+import me.him188.ani.app.ui.search.isLoadingNextPage
+import me.him188.ani.utils.platform.isMobile
+
+/**
+ * @param pullToRefreshEnabled 是否启用下拉刷新. 当此列表位于会优先消费向下滚动的容器中时
+ * (例如 [me.him188.ani.app.ui.foundation.layout.NestedScrollableColumn] 的 header 未完全展开),
+ * 应传 `false`, 否则下拉刷新会先于容器消费掉下拉手势.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun CommentColumn(
+    items: LazyPagingItems<UIComment>,
+    modifier: Modifier = Modifier,
+    hasDividerLine: Boolean = true,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    connectedScrollState: ConnectedScrollState? = null,
+    state: LazyGridState = rememberLazyGridState(),
+    pullToRefreshEnabled: Boolean = true,
+    commentItem: @Composable LazyGridItemScope.(index: Int, item: UIComment) -> Unit
+) {
+    val emptyContentModifier = Modifier
+        .thenNotNull(
+            connectedScrollState?.let {
+                Modifier.nestedScroll(connectedScrollState.nestedScrollConnection)
+            },
+        )
+    val listContentModifier = Modifier
+        .thenNotNull(
+            connectedScrollState?.let {
+                Modifier.nestedScroll(connectedScrollState.nestedScrollConnection)
+                    .nestedScrollWorkaround(state, connectedScrollState)
+            },
+        )
+
+    PullToRefreshBox(
+        isRefreshing = items.isLoadingFirstPageOrRefreshing,
+        onRefresh = { items.refresh() },
+        modifier = modifier,
+        enabled = pullToRefreshEnabled && LocalPlatform.current.isMobile(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        if (items.isFinishedAndEmpty) {
+            Box(
+                modifier = emptyContentModifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                CommentDefaults.EmptyPlaceholder()
+            }
+            return@PullToRefreshBox
+        }
+
+        SearchResultLazyVerticalGrid(
+            items,
+            error = {
+                LoadErrorCard(
+                    error = it,
+                    onRetry = { items.retry() },
+                    modifier = Modifier.fillMaxWidth(), // noop
+                )
+            },
+            modifier = listContentModifier,
+            contentPadding = contentPadding,
+            cells = GridCells.Fixed(1),
+            showLoadingIndicatorInFirstPage = false, // Use PTR instead
+            state = state,
+        ) {
+            item("spacer header") { Spacer(Modifier.height(1.dp)) }
+
+            items(
+                items.itemCount,
+                key = items.itemKey { "CommentColumn-" + it.stableId },
+                contentType = items.itemContentType(),
+            ) { index ->
+                Column {
+                    val item = items[index] ?: return@items
+                    commentItem(index, item)
+
+                    if (hasDividerLine && index != items.itemCount - 1) {
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = DividerDefaults.color.stronglyWeaken(),
+                        )
+                    }
+                }
+            }
+
+            if (items.isLoadingNextPage) {
+                item("dummy loader") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        LoadingIndicator()
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,1 @@
+../gradlew iosFramework --no-daemon "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx16g" "-Dkotlin.daemon.jvm.options=-Xmx16g" --scan "-Dfile.encoding=UTF-8" "--max-workers=3"

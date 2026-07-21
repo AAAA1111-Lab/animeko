@@ -1,0 +1,47 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+local.properties
+.kotlin/
+**/test-sandbox/
+**/*.podspec
+/venv/
+/*.patch
+bin/
+Podfile.lock
+
+# Local source files
+**/local.kt
+
+# Android build outputs
+app/android/release
+app/android/debug
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+.run/Preview*.xml
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+.env
+kls_database.db
+/torrent/anitorrent/*.dylib
+/torrent/anitorrent/*.dll
+/torrent/anitorrent/*.so
+/app/desktop/appResources/windows-arm64/lib/
+/app/ios/Animeko/GoogleService-Info.plist
+/app/ios/12.4.0
+/app/ios/xcb2.log
+/app/ios/xcodebuild.log
