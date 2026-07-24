@@ -107,7 +107,11 @@ import me.him188.ani.app.domain.foundation.VersionExpiryService
 import me.him188.ani.app.domain.foundation.get
 import me.him188.ani.app.domain.foundation.withValue
 import me.him188.ani.app.domain.mediasource.web.PageEvaluator
+import me.him188.ani.app.domain.mediasource.web.captcha.BrowserImageCaptchaSolver
 import me.him188.ani.app.domain.mediasource.web.captcha.CaptchaBrowserFactory
+import me.him188.ani.app.domain.mediasource.web.captcha.GirigiriSearchRoute
+import me.him188.ani.app.domain.mediasource.web.captcha.ImageCaptchaRecognizer
+import me.him188.ani.app.domain.mediasource.web.captcha.MacCmsImageCaptchaSolver
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSessionManager
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceCookieJar
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistry
@@ -211,9 +215,12 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
     single<WebSourceIdentityRegistry> { WebSourceIdentityRegistry() }
     single<WebSessionManager> {
         val browserFactory = get<CaptchaBrowserFactory>()
+        val evaluator = PageEvaluator()
+        val recognizer = get<ImageCaptchaRecognizer>()
+        val settingsRepository = get<SettingsRepository>()
         WebSessionManager(
             browserFactory = browserFactory,
-            evaluator = PageEvaluator(),
+            evaluator = evaluator,
             cookieJar = get(),
             identityRegistry = get(),
             client = get<HttpClientProvider>().get(
@@ -222,9 +229,14 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
                 identityRegistry = get(),
             ),
             backgroundScope = coroutineScope,
-            // v1 不注入任何自动解决策略与备用取数路由, 仅预留接缝
-            solvers = emptyList(),
-            searchRoutes = emptyList(),
+            solvers = listOf(
+                MacCmsImageCaptchaSolver(recognizer),
+                BrowserImageCaptchaSolver(recognizer),
+            ),
+            solverEnabled = {
+                settingsRepository.mediaSelectorSettings.flow.first().enableImageCaptchaAutoSolve
+            },
+            searchRoutes = listOf(GirigiriSearchRoute(evaluator)),
             maxSessions = browserFactory.recommendedMaxSessions,
         )
     }
