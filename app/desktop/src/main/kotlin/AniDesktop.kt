@@ -377,11 +377,10 @@ object AniDesktop {
                 } catch (e: Throwable) {
                     logger.error(e) { "Failed to load libmpv component of mediamp." }
                 }
-                logger.info { "libmpv is loaded." }
+                logger.info { "mediampv is loaded." }
             } else {
                 VlcMediampPlayer.prepareLibraries()
             }
-
         }
 
         // Initialize CEF application.
