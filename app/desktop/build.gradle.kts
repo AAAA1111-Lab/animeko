@@ -334,11 +334,12 @@ tasks.withType(KotlinCompilationTask::class) {
 }
 
 //kotlin.sourceSets.main.get().resources.srcDir(project(":common").projectDir.resolve("src/androidMain/res/raw"))
-
-tasks.withType(AbstractJPackageTask::class) {
-    doLast {
-        unpackComposeDesktopNativeLibraries()
-        reconstructLinuxSolink()
+afterEvaluate {
+    tasks.named("createReleaseDistributable", AbstractJPackageTask::class) {
+        doLast {
+            unpackComposeDesktopNativeLibraries()
+            reconstructLinuxSolink()
+        }
     }
 }
 
