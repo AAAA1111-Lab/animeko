@@ -559,29 +559,24 @@ fun EpisodeDetails(
             }
         } else null,
         subjectRecommendations = { horizontalPadding ->
-            item("subject_recommendation_header") {
-                SectionTitle {
-                    Text(stringResource(Lang.subject_episode_related_recommendations))
+            if (subjectRecommendations.isNotEmpty()) {
+                item("subject_recommendation_header") {
+                    SectionTitle {
+                        Text(stringResource(Lang.subject_episode_related_recommendations))
+                    }
                 }
-            }
-            for (recommendation in subjectRecommendations) {
-                item("subject_recommendation_${recommendation.uniqueId}") {
-                    SubjectRecommendationCard(
-                        {
-                            val uri = recommendation.uri
-                            val targetSubjectId = recommendation.subjectId?.toInt()
-                            Analytics.recordEvent(SubjectRecommendationClick) {
-                                targetSubjectId?.let { put("subject_id", it) }
-                                uri?.let { put("target_uri", it) }
-                            }
-                            Analytics.recordEvent(SubjectEnter) {
-                                put("source", "episode_recommendation")
-                                targetSubjectId?.let { put("subject_id", it) }
-                                uri?.let { put("target_uri", it) }
-                            }
-                            if (uri != null) {
-                                browserNavigator.openBrowser(context, uri)
-                            } else if (targetSubjectId != null) {
+                for (recommendation in subjectRecommendations) {
+                    item("subject_recommendation_${recommendation.uniqueId}") {
+                        SubjectRecommendationCard(
+                            {
+                                val targetSubjectId = recommendation.subjectId?.toInt() ?: return@SubjectRecommendationCard
+                                Analytics.recordEvent(SubjectRecommendationClick) {
+                                    put("subject_id", targetSubjectId)
+                                }
+                                Analytics.recordEvent(SubjectEnter) {
+                                    put("source", "episode_recommendation")
+                                    put("subject_id", targetSubjectId)
+                                }
                                 navigator.navigateSubjectDetails(
                                     targetSubjectId,
                                     SubjectDetailPlaceholder(
@@ -591,14 +586,14 @@ fun EpisodeDetails(
                                         coverUrl = recommendation.imageUrl,
                                     ),
                                 )
-                            }
-                        },
-                        recommendation,
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontalPadding)
-                            .padding(bottom = 12.dp),
-                    )
+                            },
+                            recommendation,
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontalPadding)
+                                .padding(bottom = 12.dp),
+                        )
+                    }
                 }
             }
         },
