@@ -1,0 +1,141 @@
+name: Manual Build (Windows & Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: '选择构建平台 (Target Platform)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'android'
+          - 'windows'
+      android_abi:
+        description: 'Android 架构过滤 (默认 arm64-v8a 最快)'
+        required: true
+        default: 'arm64-v8a'
+        type: choice
+        options:
+          - 'arm64-v8a'
+          - 'x86_64'
+          - 'all'
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: 'Build Android APK'
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Enable Linux Swap
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
+      - name: Configure local.properties
+        run: |
+          echo "ani.android.abis=${{ inputs.android_abi }}" >> local.properties
+          echo "ani.enable.firebase=false" >> local.properties
+          echo "jvm.toolchain.version=21" >> local.properties
+
+      - name: Download JBR 21
+        id: download-jbr
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+          JBR_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-linux-x64-b1163.116.tar.gz'
+          JBR_CHECKSUM_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-linux-x64-b1163.116.tar.gz.checksum'
+        run: python3 .github/workflows/download_jbr.py
+
+      - name: Setup JBR 21
+        uses: gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d
+        with:
+          java-version: '21'
+          distribution: 'jdkfile'
+          jdkFile: ${{ steps.download-jbr.outputs.jbrLocation }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Build Android Debug APK
+        run: |
+          ./gradlew assembleDefaultDebug \
+            "-Dfile.encoding=UTF-8" \
+            "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ani-android-debug-apk
+          path: app/android/build/outputs/apk/default/debug/*.apk
+          if-no-files-found: error
+
+  build-windows:
+    name: 'Build Windows Distributable'
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure local.properties
+        shell: bash
+        run: |
+          echo "ani.enable.firebase=false" >> local.properties
+          echo "jvm.toolchain.version=21" >> local.properties
+
+      - name: Download JBR 21
+        id: download-jbr
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+          JBR_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-windows-x64-b1163.116.tar.gz'
+          JBR_CHECKSUM_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-windows-x64-b1163.116.tar.gz.checksum'
+        shell: cmd
+        run: python .github/workflows/download_jbr.py
+
+      - name: Setup JBR 21
+        uses: gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d
+        with:
+          java-version: '21'
+          distribution: 'jdkfile'
+          jdkFile: ${{ steps.download-jbr.outputs.jbrLocation }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Build Windows Release Distributable
+        shell: bash
+        run: |
+          ./gradlew :app:desktop:createReleaseDistributable \
+            "-Dfile.encoding=UTF-8" \
+            "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
+
+      - name: Compress Windows Distributable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "app/desktop/build/compose/binaries/main-release/app/*" -DestinationPath "ani-windows-x64-portable.zip"
+
+      - name: Upload Windows Portable Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ani-windows-x64-portable
+          path: ani-windows-x64-portable.zip
+          if-no-files-found: error
