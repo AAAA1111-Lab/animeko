@@ -48,6 +48,8 @@ import org.openani.mediamp.io.SeekableInput
 import org.openani.mediamp.source.MediaData
 import org.openani.mediamp.source.SeekableInputMediaData
 import org.openani.mediamp.source.UriMediaData
+import me.him188.ani.app.videoplayer.ui.videoDisplaySizeOrNull
+import org.openani.mediamp.metadata.MediaProperties
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.milliseconds
@@ -137,6 +139,22 @@ class LibassExoPlayerMediampPlayer private constructor(
             exoMediampPlayer.mediaData.collect(
                 FlowCollector { value -> collector.emit(value.unwrapTracking()) },
             )
+    }
+
+    override val mediaProperties: StateFlow<MediaProperties?> = object : StateFlow<MediaProperties?> {
+        private fun patchProperties(props: MediaProperties?): MediaProperties? {
+            if (props == null) return null
+            if (props.videoWidth != null && props.videoHeight != null) return props
+            val displaySize = exoPlayer.videoDisplaySizeOrNull() ?: return props
+            return props.copy(videoWidth = displaySize.width, videoHeight = displaySize.height)
+        }
+
+        override val value: MediaProperties? get() = patchProperties(exoMediampPlayer.mediaProperties.value)
+        override val replayCache: List<MediaProperties?> get() = listOf(value)
+        override suspend fun collect(collector: FlowCollector<MediaProperties?>): Nothing =
+            exoMediampPlayer.mediaProperties.collect { props ->
+                collector.emit(patchProperties(props))
+            }
     }
 
     override fun seekTo(positionMillis: Long) {
