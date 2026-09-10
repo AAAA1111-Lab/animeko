@@ -73,6 +73,51 @@ class JellyfinMediaSourceAuthenticationTest {
     }
 
     @Test
+    fun `default display name is Jellyfin when name parameter is omitted or blank`() {
+        val defaultSource = JellyfinMediaSource(
+            config = passwordConfig(),
+            client = mockClient { error("should not be called") },
+        )
+        assertEquals("Jellyfin", defaultSource.info.displayName)
+        assertEquals("jellyfin", defaultSource.mediaSourceId)
+
+        val blankSource = JellyfinMediaSource(
+            config = MediaSourceConfig(
+                arguments = mapOf(
+                    "name" to "   ",
+                    "baseUrl" to TEST_BASE_URL,
+                    "authMode" to JellyfinMediaSource.AUTH_MODE_API_KEY,
+                    "userId" to "user-id",
+                    "apikey" to "api-key",
+                ),
+            ),
+            client = mockClient { error("should not be called") },
+            instanceId = "custom-instance-id",
+        )
+        assertEquals("Jellyfin", blankSource.info.displayName)
+        assertEquals("custom-instance-id", blankSource.mediaSourceId)
+    }
+
+    @Test
+    fun `custom display name and instanceId are preserved`() {
+        val customSource = JellyfinMediaSource(
+            config = MediaSourceConfig(
+                arguments = mapOf(
+                    "name" to "我的家庭媒体库",
+                    "baseUrl" to TEST_BASE_URL,
+                    "authMode" to JellyfinMediaSource.AUTH_MODE_API_KEY,
+                    "userId" to "user-id",
+                    "apikey" to "api-key",
+                ),
+            ),
+            client = mockClient { error("should not be called") },
+            instanceId = "jellyfin-home-server",
+        )
+        assertEquals("我的家庭媒体库", customSource.info.displayName)
+        assertEquals("jellyfin-home-server", customSource.mediaSourceId)
+    }
+
+    @Test
     fun `password mode logs in once and reuses the returned session`() = runTest {
         var loginCount = 0
         var itemsCount = 0
