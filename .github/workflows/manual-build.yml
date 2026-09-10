@@ -13,7 +13,7 @@ on:
           - 'android'
           - 'windows'
       android_abi:
-        description: 'Android 架构过滤 (默认 arm64-v8a 最快)'
+        description: 'Android 架构 (默认仅编译 arm64-v8a)'
         required: true
         default: 'arm64-v8a'
         type: choice
@@ -21,9 +21,19 @@ on:
           - 'arm64-v8a'
           - 'x86_64'
           - 'all'
+      create_release:
+        description: '发布到 GitHub Releases (可在 Releases 页面直接点击下载 .apk 与单层 .zip)'
+        required: true
+        default: true
+        type: boolean
+      release_tag:
+        description: 'Release Tag 名称 (留空则默认为 v6.1.0-build-<运行编号>)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -50,6 +60,7 @@ jobs:
       - name: Configure local.properties
         run: |
           echo "ani.android.abis=${{ inputs.android_abi }}" >> local.properties
+          echo "ani.android.universal=false" >> local.properties
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
           echo "kotlin.native.ignoreDisabledTargets=true" >> local.properties
@@ -77,17 +88,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Android Debug APK
+      - name: Build Android Release APK
         run: |
-          ./gradlew assembleDefaultDebug \
+          ./gradlew assembleDefaultRelease \
             "-Dfile.encoding=UTF-8" \
             "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: ani-android-debug-apk
-          path: app/android/build/outputs/apk/default/debug/*.apk
+          name: ani-android-release-apk
+          path: app/android/build/outputs/apk/default/release/*.apk
           if-no-files-found: error
 
   build-windows:
@@ -135,14 +146,63 @@ jobs:
             "-Dfile.encoding=UTF-8" \
             "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
 
-      - name: Compress Windows Distributable
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "app/desktop/build/compose/binaries/main-release/app/*" -DestinationPath "ani-windows-x64-portable.zip"
-
-      - name: Upload Windows Portable Zip
+      - name: Upload Windows Portable
         uses: actions/upload-artifact@v4
         with:
           name: ani-windows-x64-portable
-          path: ani-windows-x64-portable.zip
+          path: app/desktop/build/compose/binaries/main-release/app
           if-no-files-found: error
+
+  publish-release:
+    name: 'Publish to GitHub Release'
+    needs: [build-android, build-windows]
+    if: ${{ always() && inputs.create_release && (needs.build-android.result == 'success' || needs.build-windows.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: raw-artifacts
+
+      - name: Package Assets for Release
+        run: |
+          mkdir -p release-files
+          # 处理 Android APK (规范命名为 Animeko-6.1.0-arm64-v8a.apk，直接安装，无需解压)
+          if [ -d "raw-artifacts/ani-android-release-apk" ]; then
+            for f in raw-artifacts/ani-android-release-apk/*.apk; do
+              if [ -f "$f" ]; then
+                fname=$(basename "$f")
+                clean_name=$(echo "$fname" | sed 's/app-default/Animeko-6.1.0/')
+                cp "$f" "release-files/$clean_name"
+              fi
+            done
+          fi
+          # 压缩 Windows 绿色便携包 (单层 zip，解压即用)
+          if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
+            cd raw-artifacts/ani-windows-x64-portable
+            zip -r ../../release-files/Animeko-6.1.0-windows-x64.zip .
+            cd ../..
+          fi
+          ls -lh release-files
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || format('v6.1.0-build-{0}', github.run_number) }}
+          name: ${{ inputs.release_tag != '' && inputs.release_tag || format('Animeko v6.1.0 (Build #{0})', github.run_number) }}
+          body: |
+            ### Animeko v6.1.0 构建产物 (Build #${{ github.run_number }})
+            
+            - **Android**: `Animeko-6.1.0-arm64-v8a-release.apk` (Release 正式版，包名 `me.him188.ani`，手机可直接点击下载安装，无需解压)
+            - **Windows**: `Animeko-6.1.0-windows-x64.zip` (绿色便携版，单层压缩包解压即用)
+            
+            *构建方式: GitHub Actions 手动调度*
+          files: release-files/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
