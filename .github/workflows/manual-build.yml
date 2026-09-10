@@ -38,8 +38,11 @@ jobs:
           submodules: recursive
 
       - name: Enable Linux Swap
+        continue-on-error: true
         run: |
-          sudo fallocate -l 8G /swapfile
+          sudo swapoff /swapfile 2>/dev/null || true
+          sudo rm -f /swapfile 2>/dev/null || true
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -49,6 +52,7 @@ jobs:
           echo "ani.android.abis=${{ inputs.android_abi }}" >> local.properties
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
+          echo "kotlin.native.ignoreDisabledTargets=true" >> local.properties
 
       - name: Download JBR 21
         id: download-jbr
@@ -70,11 +74,14 @@ jobs:
         with:
           cache-disabled: false
 
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
       - name: Build Android Debug APK
         run: |
           ./gradlew assembleDefaultDebug \
             "-Dfile.encoding=UTF-8" \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
+            "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
