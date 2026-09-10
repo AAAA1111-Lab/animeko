@@ -35,27 +35,32 @@ val archs = getPropertyOrNull("ani.android.abis")
 android {
     namespace = "me.him188.ani.android"
     compileSdk = getIntProperty("android.compile.sdk")
+    val enableSplits = getPropertyOrNull("ani.android.splits")?.toBooleanStrictOrNull() ?: false
     defaultConfig {
         applicationId = "me.him188.ani"
         minSdk = getIntProperty("android.min.sdk")
         targetSdk = getIntProperty("android.compile.sdk")
         versionCode = getIntProperty("android.version.code")
         versionName = project.version.toString()
-        ndk {
-            // Specifies the ABI configurations of your native
-            // libraries Gradle should build and package with your app.
-            abiFilters.clear()
-            //noinspection ChromeOsAbiSupport
-            abiFilters += archs
+        if (!enableSplits) {
+            ndk {
+                // Specifies the ABI configurations of your native
+                // libraries Gradle should build and package with your app.
+                abiFilters.clear()
+                //noinspection ChromeOsAbiSupport
+                abiFilters += archs
+            }
         }
     }
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            //noinspection ChromeOsAbiSupport
-            include(*archs.toTypedArray())
-            isUniversalApk = getPropertyOrNull("ani.android.universal")?.toBooleanStrictOrNull() ?: false
+    if (enableSplits) {
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                //noinspection ChromeOsAbiSupport
+                include(*archs.toTypedArray())
+                isUniversalApk = getPropertyOrNull("ani.android.universal")?.toBooleanStrictOrNull() ?: false
+            }
         }
     }
     signingConfigs {
