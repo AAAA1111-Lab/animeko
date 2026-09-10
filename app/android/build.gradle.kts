@@ -55,7 +55,7 @@ android {
             reset()
             //noinspection ChromeOsAbiSupport
             include(*archs.toTypedArray())
-            isUniversalApk = true // 额外构建一个
+            isUniversalApk = getPropertyOrNull("ani.android.universal")?.toBooleanStrictOrNull() ?: false
         }
     }
     signingConfigs {
@@ -91,7 +91,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 *sharedAndroidProguardRules(),
