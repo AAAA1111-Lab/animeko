@@ -12,15 +12,6 @@ on:
           - 'all'
           - 'android'
           - 'windows'
-      android_abi:
-        description: 'Android 架构 (默认仅编译 arm64-v8a)'
-        required: true
-        default: 'arm64-v8a'
-        type: choice
-        options:
-          - 'arm64-v8a'
-          - 'x86_64'
-          - 'all'
       create_release:
         description: '发布到 GitHub Releases (可在 Releases 页面直接点击下载 .apk 与单层 .zip)'
         required: true
@@ -59,11 +50,15 @@ jobs:
 
       - name: Configure local.properties
         run: |
-          echo "ani.android.abis=${{ inputs.android_abi }}" >> local.properties
+          echo "ani.android.abis=arm64-v8a" >> local.properties
           echo "ani.android.universal=false" >> local.properties
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
           echo "kotlin.native.ignoreDisabledTargets=true" >> local.properties
+          echo "signing_release_storeFileFromRoot=signing/animeko-release.keystore" >> local.properties
+          echo "signing_release_storePassword=animeko123" >> local.properties
+          echo "signing_release_keyAlias=animeko" >> local.properties
+          echo "signing_release_keyPassword=animeko123" >> local.properties
 
       - name: Download JBR 21
         id: download-jbr

@@ -59,20 +59,30 @@ android {
         }
     }
     signingConfigs {
-        kotlin.runCatching { getProperty("signing_release_storeFileFromRoot") }.getOrNull()?.let {
+        val rootKeystore = rootProject.file("signing/animeko-release.keystore")
+        if (rootKeystore.exists()) {
             create("release") {
-                storeFile = rootProject.file(it)
-                storePassword = getProperty("signing_release_storePassword")
-                keyAlias = getProperty("signing_release_keyAlias")
-                keyPassword = getProperty("signing_release_keyPassword")
+                storeFile = rootKeystore
+                storePassword = getPropertyOrNull("signing_release_storePassword") ?: "animeko123"
+                keyAlias = getPropertyOrNull("signing_release_keyAlias") ?: "animeko"
+                keyPassword = getPropertyOrNull("signing_release_keyPassword") ?: "animeko123"
             }
-        }
-        kotlin.runCatching { getProperty("signing_release_storeFile") }.getOrNull()?.let {
-            create("release") {
-                storeFile = file(it)
-                storePassword = getProperty("signing_release_storePassword")
-                keyAlias = getProperty("signing_release_keyAlias")
-                keyPassword = getProperty("signing_release_keyPassword")
+        } else {
+            kotlin.runCatching { getProperty("signing_release_storeFileFromRoot") }.getOrNull()?.let {
+                create("release") {
+                    storeFile = rootProject.file(it)
+                    storePassword = getProperty("signing_release_storePassword")
+                    keyAlias = getProperty("signing_release_keyAlias")
+                    keyPassword = getProperty("signing_release_keyPassword")
+                }
+            }
+            kotlin.runCatching { getProperty("signing_release_storeFile") }.getOrNull()?.let {
+                create("release") {
+                    storeFile = file(it)
+                    storePassword = getProperty("signing_release_storePassword")
+                    keyAlias = getProperty("signing_release_keyAlias")
+                    keyPassword = getProperty("signing_release_keyPassword")
+                }
             }
         }
     }
