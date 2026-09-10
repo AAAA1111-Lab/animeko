@@ -61,6 +61,12 @@ jobs:
           echo "signing_release_keyAlias=animeko" >> local.properties
           echo "signing_release_keyPassword=animeko123" >> local.properties
 
+      - name: Cache JBR 21
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/jbrsdk_jcef-21*
+          key: jbr-21-${{ runner.os }}-${{ hashFiles('.github/workflows/download_jbr.py') }}
+
       - name: Download JBR 21
         id: download-jbr
         env:
@@ -87,8 +93,10 @@ jobs:
       - name: Build Android Release APK
         run: |
           ./gradlew assembleDefaultRelease \
+            --parallel \
+            --build-cache \
             "-Dfile.encoding=UTF-8" \
-            "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g"
+            "-Dorg.gradle.jvmargs=-Xmx3g -Dkotlin.daemon.jvm.options=-Xmx4g"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -113,6 +121,12 @@ jobs:
         run: |
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
+
+      - name: Cache JBR 21
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/jbrsdk_jcef-21*
+          key: jbr-21-${{ runner.os }}-${{ hashFiles('.github/workflows/download_jbr.py') }}
 
       - name: Download JBR 21
         id: download-jbr
@@ -139,6 +153,8 @@ jobs:
         shell: bash
         run: |
           ./gradlew :app:desktop:createReleaseDistributable \
+            --parallel \
+            --build-cache \
             "-Dfile.encoding=UTF-8" \
             "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
 
