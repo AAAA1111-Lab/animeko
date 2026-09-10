@@ -51,6 +51,7 @@ jobs:
       - name: Configure local.properties
         run: |
           echo "ani.android.abis=arm64-v8a" >> local.properties
+          echo "ani.android.splits=false" >> local.properties
           echo "ani.android.universal=false" >> local.properties
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
@@ -168,9 +169,7 @@ jobs:
           if [ -d "raw-artifacts/ani-android-release-apk" ]; then
             for f in raw-artifacts/ani-android-release-apk/*.apk; do
               if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                clean_name=$(echo "$fname" | sed 's/app-default/Animeko-6.1.0/')
-                cp "$f" "release-files/$clean_name"
+                cp "$f" "release-files/Animeko-6.1.0-arm64-v8a-release.apk"
               fi
             done
           fi
