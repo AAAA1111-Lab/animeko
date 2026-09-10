@@ -4,22 +4,7 @@
 
 name: 'Build'
 on:
-  push:
-    paths-ignore:
-    - '**/*.md'
-    - '.idea/**'
-    - '.junie/**'
-    - '.readme/**'
-    - '.run/**'
-    - 'scripts/*'
-  pull_request:
-    paths-ignore:
-    - '**/*.md'
-    - '.idea/**'
-    - '.junie/**'
-    - '.readme/**'
-    - '.run/**'
-    - 'scripts/*'
+  workflow_dispatch:
 concurrency:
   group: '${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name == ''main'' && github.run_id || github.ref_name }}'
   cancel-in-progress: true
