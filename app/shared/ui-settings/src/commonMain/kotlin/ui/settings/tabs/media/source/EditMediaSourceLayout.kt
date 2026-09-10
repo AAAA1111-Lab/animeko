@@ -141,6 +141,7 @@ sealed class ArgumentState(
     private val parameter: MediaSourceParameter<*>,
 ) {
     val name: String get() = parameter.name
+    val label: String get() = parameter.label
     val description: String? get() = parameter.description
     val visibleWhen get() = parameter.visibleWhen
 
@@ -269,7 +270,7 @@ internal fun EditMediaSourceDialog(
                                     modifier = Modifier.testTag(EditMediaSourceTestTags.argument(argument.name)),
                                     value = argument.value,
                                     onValueChange = { argument.value = argument.parameter.sanitize(it) },
-                                    label = { Text(argument.name) },
+                                    label = { Text(argument.label) },
                                     placeholder = argument.parameter.placeholder?.let { { Text(it) } },
                                     supportingText = argument.description?.let { { Text(it) } },
                                     isError = argument.isError,
@@ -328,7 +329,7 @@ private fun SimpleEnumArgument(argument: SimpleEnumArgumentState, modifier: Modi
                 onValueChange = {},
                 readOnly = true,
                 singleLine = true,
-                label = { Text(argument.name) },
+                label = { Text(argument.label) },
                 supportingText = argument.description?.let { { Text(it) } },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
@@ -360,7 +361,7 @@ private fun BooleanArgument(argument: BooleanArgumentState, modifier: Modifier =
         Column(Modifier.weight(1f).padding(start = 8.dp).padding(end = 16.dp)) {
             ProvideTextStyle(MaterialTheme.typography.bodyLarge) {
                 Text(
-                    argument.name,
+                    argument.label,
                 )
             }
             ProvideTextStyle(MaterialTheme.typography.labelMedium) {

@@ -119,7 +119,7 @@ interface MediaSource : AutoCloseable {
     override fun close() {}
 }
 
-class MediaSourceInfo(
+data class MediaSourceInfo(
     val displayName: String,
     val description: String? = null,
     val websiteUrl: String? = null,

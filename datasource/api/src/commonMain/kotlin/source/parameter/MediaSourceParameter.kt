@@ -2,6 +2,8 @@ package me.him188.ani.datasources.api.source.parameter
 
 sealed interface MediaSourceParameter<T> {
     val name: String
+    val label: String
+        get() = name
     val description: String?  // todo: how to localize?
     val default: () -> T
     val visibleWhen: MediaSourceParameterVisibilityCondition?
@@ -45,6 +47,7 @@ class StringParameter(
      */
     val sanitize: (String) -> String = NoopSanitizer,
     override val visibleWhen: MediaSourceParameterVisibilityCondition? = null,
+    override val label: String = name,
 ) : MediaSourceParameter<String> {
     val validate: (String) -> Boolean = {
         if (isRequired && it.isBlank()) {
@@ -68,6 +71,7 @@ data class BooleanParameter(
     override val description: String? = null,
     override val default: () -> Boolean,
     override val visibleWhen: MediaSourceParameterVisibilityCondition? = null,
+    override val label: String = name,
 ) : MediaSourceParameter<Boolean> {
     init {
         require(name.isNotEmpty()) { "name must not be empty" }
@@ -84,6 +88,7 @@ data class SimpleEnumParameter(
     override val description: String? = null,
     override val default: () -> String,
     override val visibleWhen: MediaSourceParameterVisibilityCondition? = null,
+    override val label: String = name,
 ) : MediaSourceParameter<String> {
     init {
         require(name.isNotEmpty()) { "name must not be empty" }
