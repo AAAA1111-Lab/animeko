@@ -211,14 +211,9 @@ EOF
           fi
 
           if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
-            NOTICE=$(cat << 'EOF'
+            BODY="$BODY
 
----
-> **注意事项（Android 平台）**  
-> Android 平台使用了新的固定签名证书。若从官方主线版本迁移，因签名不一致需先卸载原版本再安装，建议在迁移前先备份当前配置与数据。后续相同签名的构建均可直接覆盖安装。
-EOF
-)
-            BODY="${BODY}${NOTICE}"
+Android平台使用了新的固定证书，如果从主线版本迁移需要先卸载再安装，建议先备份当前配置。"
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
