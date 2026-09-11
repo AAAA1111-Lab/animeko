@@ -212,8 +212,7 @@ EOF
 
           if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
             BODY="$BODY
-
-Android平台使用了新的固定证书，如果从主线版本迁移需要先卸载再安装，建议先备份当前配置。"
+Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置"
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
