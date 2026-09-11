@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: '选择构建平台 (Target Platform)'
+        description: '构建平台 (android / windows / all)'
         required: true
-        default: 'all'
+        default: 'android'
         type: choice
         options:
-          - 'all'
           - 'android'
           - 'windows'
-      create_release:
-        description: '发布到 GitHub Releases (可在 Releases 页面直接点击下载 .apk 与单层 .zip)'
-        required: true
-        default: true
-        type: boolean
+          - 'all'
       release_tag:
-        description: 'Release Tag 名称 (留空则默认为 v6.1.0-build-<运行编号>)'
+        description: '发布版本号 (留空自动生成 v6.1.0-lab.<编号>)'
+        required: false
+        default: ''
+        type: string
+      release_notes:
+        description: '发布说明 (留空自动使用精简变更描述；若是主线合并可填 如: 合并主线 x.x.x 更新)'
         required: false
         default: ''
         type: string
@@ -39,27 +39,22 @@ jobs:
           submodules: recursive
 
       - name: Enable Linux Swap
-        continue-on-error: true
-        run: |
-          sudo swapoff /swapfile 2>/dev/null || true
-          sudo rm -f /swapfile 2>/dev/null || true
-          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+        run: sudo fallocate -l 4G /swapfile 2>/dev/null && sudo chmod 600 /swapfile && sudo mkswap /swapfile 2>/dev/null && sudo swapon /swapfile 2>/dev/null || true
 
       - name: Configure local.properties
         run: |
-          echo "ani.android.abis=arm64-v8a" >> local.properties
-          echo "ani.android.splits=false" >> local.properties
-          echo "ani.android.universal=false" >> local.properties
-          echo "ani.enable.firebase=false" >> local.properties
-          echo "jvm.toolchain.version=21" >> local.properties
-          echo "kotlin.native.ignoreDisabledTargets=true" >> local.properties
-          echo "signing_release_storeFileFromRoot=signing/animeko-release.keystore" >> local.properties
-          echo "signing_release_storePassword=animeko123" >> local.properties
-          echo "signing_release_keyAlias=animeko" >> local.properties
-          echo "signing_release_keyPassword=animeko123" >> local.properties
+          cat << 'EOF' >> local.properties
+          ani.android.abis=arm64-v8a
+          ani.android.splits=false
+          ani.android.universal=false
+          ani.enable.firebase=false
+          jvm.toolchain.version=21
+          kotlin.native.ignoreDisabledTargets=true
+          signing_release_storeFileFromRoot=signing/animeko-release.keystore
+          signing_release_storePassword=animeko123
+          signing_release_keyAlias=animeko
+          signing_release_keyPassword=animeko123
+          EOF
 
       - name: Cache JBR 21
         uses: actions/cache@v4
@@ -87,16 +82,10 @@ jobs:
         with:
           cache-disabled: false
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build Android Release APK
         run: |
-          ./gradlew assembleDefaultRelease \
-            --parallel \
-            --build-cache \
-            "-Dfile.encoding=UTF-8" \
-            "-Dorg.gradle.jvmargs=-Xmx3g -Dkotlin.daemon.jvm.options=-Xmx4g"
+          chmod +x gradlew
+          ./gradlew assembleDefaultRelease --parallel --build-cache
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -151,12 +140,7 @@ jobs:
 
       - name: Build Windows Release Distributable
         shell: bash
-        run: |
-          ./gradlew :app:desktop:createReleaseDistributable \
-            --parallel \
-            --build-cache \
-            "-Dfile.encoding=UTF-8" \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dkotlin.daemon.jvm.options=-Xmx4g"
+        run: ./gradlew :app:desktop:createReleaseDistributable --parallel --build-cache
 
       - name: Upload Windows Portable
         uses: actions/upload-artifact@v4
@@ -168,7 +152,7 @@ jobs:
   publish-release:
     name: 'Publish to GitHub Release'
     needs: [build-android, build-windows]
-    if: ${{ always() && inputs.create_release && (needs.build-android.result == 'success' || needs.build-windows.result == 'success') }}
+    if: ${{ always() && (needs.build-android.result == 'success' || needs.build-windows.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -181,15 +165,11 @@ jobs:
       - name: Package Assets for Release
         run: |
           mkdir -p release-files
-          # 处理 Android APK (规范命名为 Animeko-6.1.0-arm64-v8a.apk，直接安装，无需解压)
           if [ -d "raw-artifacts/ani-android-release-apk" ]; then
             for f in raw-artifacts/ani-android-release-apk/*.apk; do
-              if [ -f "$f" ]; then
-                cp "$f" "release-files/Animeko-6.1.0-arm64-v8a-release.apk"
-              fi
+              [ -f "$f" ] && cp "$f" "release-files/Animeko-6.1.0-arm64-v8a-release.apk"
             done
           fi
-          # 压缩 Windows 绿色便携包 (单层 zip，解压即用)
           if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
             cd raw-artifacts/ani-windows-x64-portable
             zip -r ../../release-files/Animeko-6.1.0-windows-x64.zip .
@@ -197,22 +177,53 @@ jobs:
           fi
           ls -lh release-files
 
+      - name: Determine Release Metadata
+        id: meta
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v6.1.0-lab.${{ github.run_number }}"
+          fi
+
+          PLATFORM="${{ inputs.platform }}"
+          if [ "$PLATFORM" = "android" ]; then
+            NAME="$TAG Android"
+          elif [ "$PLATFORM" = "windows" ]; then
+            NAME="$TAG Windows"
+          else
+            NAME="$TAG"
+          fi
+
+          CUSTOM_NOTES="${{ inputs.release_notes }}"
+          if [ -n "$CUSTOM_NOTES" ]; then
+            BODY="$CUSTOM_NOTES"
+          else
+            BODY=$(cat << 'EOF'
+### 更新内容
+- 移除应用内推广卡片与外链广告
+- Jellyfin 媒体源支持自定义显示名称与多实例隔离
+- 修复 Android 端全屏播放内嵌 ASS 字幕拉伸异常
+- 内置长期固定签名证书，支持后续直接覆盖安装
+EOF
+)
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
-        continue-on-error: true
         with:
-          tag_name: "${{ inputs.release_tag != '' && inputs.release_tag || format('v6.1.0-build-{0}', github.run_number) }}"
-          name: "${{ inputs.release_tag != '' && inputs.release_tag || format('Animeko v6.1.0 (Build No.{0})', github.run_number) }}"
-          body: |
-            ### Animeko v6.1.0 构建产物 (Build #${{ github.run_number }})
-            
-            - **Android**: `Animeko-6.1.0-arm64-v8a-release.apk` (Release 正式版，包名 `me.him188.ani`，手机可直接点击下载安装，无需解压)
-            - **Windows**: `Animeko-6.1.0-windows-x64.zip` (绿色便携版，单层压缩包解压即用)
-            
-            *构建方式: GitHub Actions 手动调度*
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          body: ${{ steps.meta.outputs.body }}
           files: release-files/*
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
