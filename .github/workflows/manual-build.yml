@@ -13,7 +13,7 @@ on:
           - 'windows'
           - 'all'
       release_tag:
-        description: '发布版本号 (留空自动生成 v6.1.0-lab.<编号>)'
+        description: '发布版本号 (如 6.1.0；留空自动生成 v6.1.0-lab.<编号>)'
         required: false
         default: ''
         type: string
@@ -167,7 +167,7 @@ jobs:
           mkdir -p release-files
           if [ -d "raw-artifacts/ani-android-release-apk" ]; then
             for f in raw-artifacts/ani-android-release-apk/*.apk; do
-              [ -f "$f" ] && cp "$f" "release-files/Animeko-6.1.0-arm64-v8a-release.apk"
+              [ -f "$f" ] && cp "$f" "release-files/Animeko-6.1.0-android-arm64-v8a-release.apk"
             done
           fi
           if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
@@ -185,11 +185,13 @@ jobs:
             TAG="v6.1.0-lab.${{ github.run_number }}"
           fi
 
+          VERSION="${TAG#v}"
+
           PLATFORM="${{ inputs.platform }}"
           if [ "$PLATFORM" = "android" ]; then
-            NAME="$TAG Android"
+            NAME="${VERSION}-android-arm64-v8a-release"
           elif [ "$PLATFORM" = "windows" ]; then
-            NAME="$TAG Windows"
+            NAME="${VERSION}-windows-x64"
           else
             NAME="$TAG"
           fi
@@ -206,6 +208,17 @@ jobs:
 - 内置长期固定签名证书，支持后续直接覆盖安装
 EOF
 )
+          fi
+
+          if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
+            NOTICE=$(cat << 'EOF'
+
+---
+> **注意事项（Android 平台）**  
+> Android 平台使用了新的固定签名证书。若从官方主线版本迁移，因签名不一致需先卸载原版本再安装，建议在迁移前先备份当前配置与数据。后续相同签名的构建均可直接覆盖安装。
+EOF
+)
+            BODY="${BODY}${NOTICE}"
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
