@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
+import me.him188.ani.android.AniApplication
+import me.him188.ani.app.domain.media.cache.engine.AlwaysUseTorrentEngineAccess
+import me.him188.ani.app.domain.torrent.TorrentEngine
 import me.him188.ani.android.navigation.AndroidBrowserNavigator
 import me.him188.ani.android.provider.ExternalContentProviderFactoryImpl
 import me.him188.ani.app.data.models.preference.PikPakConfig
@@ -94,7 +97,7 @@ import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 fun getAndroidModules(
-    serviceConnectionManager: TorrentServiceConnectionManager,
+    serviceConnectionManager: TorrentServiceConnectionManager?,
     coroutineScope: CoroutineScope,
 ) = module {
     single<PermissionManager> {
@@ -105,8 +108,12 @@ fun getAndroidModules(
     single<ImageCaptchaRecognizer> { AndroidOnnxImageCaptchaRecognizer() }
     single<HlsPlaybackPreparer> { PlatformHlsPlaybackPreparer(get()) }
 
-    single<TorrentEngineAccess> { serviceConnectionManager }
-    single<TorrentServiceConnection<IRemoteAniTorrentEngine>> { serviceConnectionManager.connection }
+    if (serviceConnectionManager != null) {
+        single<TorrentEngineAccess> { serviceConnectionManager }
+        single<TorrentServiceConnection<IRemoteAniTorrentEngine>> { serviceConnectionManager.connection }
+    } else {
+        single<TorrentEngineAccess> { AlwaysUseTorrentEngineAccess }
+    }
 
     single<MediaSaveDirProvider> {
         val context = androidContext()
@@ -150,15 +157,21 @@ fun getAndroidModules(
         val saveDir = get<MediaSaveDirProvider>().saveDir
         logger.info { "TorrentManager base save directory: $saveDir" }
 
-        DefaultTorrentManager.create(
-            coroutineScope.coroutineContext,
-            get(),
-            client = get<HttpClientProvider>().get(ScopedHttpClientUserAgent.ANI),
-            get(),
-            get(),
-            baseSaveDir = { Path(saveDir).inSystem },
-            RemoteAnitorrentEngineFactory(get(), get(), get<ProxyProvider>().proxy),
-        )
+        if (serviceConnectionManager != null && AniApplication.FEATURE_USE_TORRENT_SERVICE) {
+            DefaultTorrentManager.create(
+                coroutineScope.coroutineContext,
+                get(),
+                client = get<HttpClientProvider>().get(ScopedHttpClientUserAgent.ANI),
+                get(),
+                get(),
+                baseSaveDir = { Path(saveDir).inSystem },
+                RemoteAnitorrentEngineFactory(get(), get(), get<ProxyProvider>().proxy),
+            )
+        } else {
+            object : TorrentManager {
+                override val engines: List<TorrentEngine> = emptyList()
+            }
+        }
     }
 
     single<HttpMediaCacheEngine> {
@@ -254,10 +267,12 @@ fun getAndroidModules(
             override fun exitApp(context: ContextMP, status: Int): Nothing {
                 runBlocking(Dispatchers.Main.immediate) {
                     (context.findActivity() as? AniComponentActivity)?.finishAffinity()
-                    context.startService(
-                        Intent(context, AniTorrentService.actualServiceClass)
-                            .apply { putExtra("stopService", true) },
-                    )
+                    if (AniApplication.FEATURE_USE_TORRENT_SERVICE) {
+                        context.startService(
+                            Intent(context, AniTorrentService.actualServiceClass)
+                                .apply { putExtra("stopService", true) },
+                        )
+                    }
                     exitProcess(status)
                 }
             }

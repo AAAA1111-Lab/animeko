@@ -83,7 +83,8 @@ class AniApplication : Application() {
          * Only use torrent service at Android 8.1 (27) or above.
          * Our minimal support is Android 8.0 (26).
          */
-        val FEATURE_USE_TORRENT_SERVICE = true
+        val FEATURE_USE_TORRENT_SERVICE: Boolean
+            get() = Build.VERSION.SDK_INT >= 27
     }
 
     inner class Instance()
@@ -117,15 +118,17 @@ class AniApplication : Application() {
 
         val torrentCacheDao: MutableStateFlow<TorrentCacheInfoDao?> = MutableStateFlow(null)
         val mediaCacheBaseSaveDir: MutableStateFlow<File?> = MutableStateFlow(null)
-        val connectionManager = TorrentServiceConnectionManager(
-            this,
-            torrentCacheInfoDao = torrentCacheDao,
-            mediaCacheBaseSaveDirFlow = mediaCacheBaseSaveDir,
-            startServiceImpl = ::startAniTorrentService,
-            stopServiceImpl = ::stopService,
-            processLifecycle = ProcessLifecycleOwner.get().lifecycle,
-            parentCoroutineContext = scope.coroutineContext,
-        )
+        val connectionManager = if (FEATURE_USE_TORRENT_SERVICE) {
+            TorrentServiceConnectionManager(
+                this,
+                torrentCacheInfoDao = torrentCacheDao,
+                mediaCacheBaseSaveDirFlow = mediaCacheBaseSaveDir,
+                startServiceImpl = ::startAniTorrentService,
+                stopServiceImpl = ::stopService,
+                processLifecycle = ProcessLifecycleOwner.get().lifecycle,
+                parentCoroutineContext = scope.coroutineContext,
+            )
+        } else null
 
         startupTimeMonitor.mark(StepName.WindowAndContext)
 
@@ -177,9 +180,11 @@ class AniApplication : Application() {
             }
         }
 
-        torrentCacheDao.value = koin.get<AniDatabase>().torrentCacheInfoDao()
-        mediaCacheBaseSaveDir.value = File(koin.get<MediaSaveDirProvider>().saveDir)
-        connectionManager.launchCheckLoop()
+        if (connectionManager != null) {
+            torrentCacheDao.value = koin.get<AniDatabase>().torrentCacheInfoDao()
+            mediaCacheBaseSaveDir.value = File(koin.get<MediaSaveDirProvider>().saveDir)
+            connectionManager.launchCheckLoop()
+        }
 
         runBlocking { analyticsInitializer.join() }
         ExternalContentProviderFactoryImpl.initializeApp(this)
