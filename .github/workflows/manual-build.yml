@@ -200,19 +200,16 @@ jobs:
           if [ -n "$CUSTOM_NOTES" ]; then
             BODY="$CUSTOM_NOTES"
           else
-            BODY=$(cat << 'EOF'
-### 更新内容
-- 移除应用内推广卡片与外链广告
-- Jellyfin 媒体源支持自定义显示名称与多实例隔离
-- 修复 Android 端全屏播放内嵌 ASS 字幕拉伸异常
-- 内置长期固定签名证书，支持后续直接覆盖安装
-EOF
-)
+            BODY=$(printf "%s\n%s\n%s\n%s\n%s" \
+              "### 更新内容" \
+              "- 移除应用内推广卡片与外链广告" \
+              "- Jellyfin 媒体源支持自定义显示名称与多实例隔离" \
+              "- 修复 Android 端全屏播放内嵌 ASS 字幕拉伸异常" \
+              "- 内置长期固定签名证书，支持后续直接覆盖安装")
           fi
 
           if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
-            BODY="$BODY
-Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置"
+            BODY=$(printf "%s\n%s" "$BODY" "Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置")
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
