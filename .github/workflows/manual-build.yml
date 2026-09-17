@@ -13,12 +13,7 @@ on:
           - 'windows'
           - 'all'
       release_tag:
-        description: '发布版本号 (如 6.1.0；留空自动生成 v6.1.0-lab.<编号>)'
-        required: false
-        default: ''
-        type: string
-      release_notes:
-        description: '发布说明 (留空自动使用精简变更描述；若是主线合并可填 如: 合并主线 x.x.x 更新)'
+        description: '发布版本号 (留空自动使用代码中的版本号)'
         required: false
         default: ''
         type: string
@@ -157,32 +152,25 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: raw-artifacts
 
-      - name: Package Assets for Release
-        run: |
-          mkdir -p release-files
-          if [ -d "raw-artifacts/ani-android-release-apk" ]; then
-            for f in raw-artifacts/ani-android-release-apk/*.apk; do
-              [ -f "$f" ] && cp "$f" "release-files/Animeko-6.1.0-android-arm64-v8a-release.apk"
-            done
-          fi
-          if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
-            cd raw-artifacts/ani-windows-x64-portable
-            zip -r ../../release-files/Animeko-6.1.0-windows-x64.zip .
-            cd ../..
-          fi
-          ls -lh release-files
-
       - name: Determine Release Metadata
         id: meta
         run: |
+          CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
+          if [ -z "$CODE_VERSION" ]; then
+            CODE_VERSION="6.2.0-alpha01"
+          fi
+
           TAG="${{ inputs.release_tag }}"
           if [ -z "$TAG" ]; then
-            TAG="v6.1.0-lab.${{ github.run_number }}"
+            TAG="v${CODE_VERSION}"
           fi
 
           VERSION="${TAG#v}"
@@ -196,9 +184,8 @@ jobs:
             NAME="$TAG"
           fi
 
-          CUSTOM_NOTES="${{ inputs.release_notes }}"
-          if [ -n "$CUSTOM_NOTES" ]; then
-            BODY="$CUSTOM_NOTES"
+          if git log -1 --pretty=%s | grep -qi "合并主线"; then
+            BODY="合并主线 ${VERSION} 更新"
           else
             BODY=$(printf "%s\n%s\n%s\n%s\n%s" \
               "### 更新内容" \
@@ -213,12 +200,29 @@ jobs:
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "name=$NAME" >> $GITHUB_OUTPUT
           {
             echo "body<<EOF"
             echo "$BODY"
             echo "EOF"
           } >> $GITHUB_OUTPUT
+
+      - name: Package Assets for Release
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p release-files
+          if [ -d "raw-artifacts/ani-android-release-apk" ]; then
+            for f in raw-artifacts/ani-android-release-apk/*.apk; do
+              [ -f "$f" ] && cp "$f" "release-files/Animeko-${VERSION}-android-arm64-v8a-release.apk"
+            done
+          fi
+          if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
+            cd raw-artifacts/ani-windows-x64-portable
+            zip -r ../../release-files/Animeko-${VERSION}-windows-x64.zip .
+            cd ../..
+          fi
+          ls -lh release-files
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
