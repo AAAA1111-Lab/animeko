@@ -120,6 +120,7 @@ import me.him188.ani.app.domain.media.cache.MediaCacheManager
 import me.him188.ani.app.domain.media.cache.MediaCacheManagerImpl
 import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
 import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.createLocalImportFileAccess
 import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.cache.engine.KtorPersistentHttpDownloader
 import me.him188.ani.app.domain.media.cache.engine.MediaCacheEngineKey
@@ -486,7 +487,9 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         LocalImportMediaCacheStorage(
             mediaSourceId = id,
             datastore = metadataStore,
-            importEngine = LocalImportMediaCacheEngine(),
+            importEngine = LocalImportMediaCacheEngine(
+                fileAccess = createLocalImportFileAccess(getContext()),
+            ),
             displayName = "LocalImport",
             parentCoroutineContext = coroutineScope.childScopeContext(),
         )

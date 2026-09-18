@@ -39,9 +39,9 @@ import me.him188.ani.app.domain.media.cache.storage.MediaSaveDirProvider
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
 import me.him188.ani.app.domain.media.hls.HlsPlaybackPreparer
 import me.him188.ani.app.domain.media.hls.PlatformHlsPlaybackPreparer
+import me.him188.ani.app.domain.media.resolver.AndroidLocalFileMediaResolver
 import me.him188.ani.app.domain.media.resolver.AndroidWebMediaResolver
 import me.him188.ani.app.domain.media.resolver.HttpStreamingMediaResolver
-import me.him188.ani.app.domain.media.resolver.LocalFileMediaResolver
 import me.him188.ani.app.domain.media.resolver.MediaResolver
 import me.him188.ani.app.domain.media.resolver.OfflineDownloadMediaResolver
 import me.him188.ani.app.domain.media.resolver.TorrentMediaResolver
@@ -249,7 +249,7 @@ fun getAndroidModules(
         MediaResolver.from(
             listOf<MediaResolver>(OfflineDownloadMediaResolver(get(), fallback = btFallback))
                 .plus(torrentResolvers)
-                .plus(LocalFileMediaResolver())
+                .plus(AndroidLocalFileMediaResolver())
                 .plus(HttpStreamingMediaResolver())
                 .plus(
                     AndroidWebMediaResolver(

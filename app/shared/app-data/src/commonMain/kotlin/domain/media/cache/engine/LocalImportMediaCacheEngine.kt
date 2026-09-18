@@ -19,12 +19,15 @@ import me.him188.ani.app.domain.media.resolver.EpisodeMetadata
 import me.him188.ani.datasources.api.Media
 import me.him188.ani.datasources.api.MediaCacheMetadata
 import me.him188.ani.datasources.api.topic.ResourceLocation
-import me.him188.ani.utils.io.exists
 import me.him188.ani.utils.io.inSystem
 import kotlin.coroutines.CoroutineContext
 
 class LocalImportMediaCacheEngine(
     override val engineKey: MediaCacheEngineKey = ENGINE_KEY,
+    /**
+     * 检查导入文件是否仍然可访问. Android 上导入的是 SAF `content://` URI, 需要平台实现通过 ContentResolver 检查.
+     */
+    val fileAccess: LocalImportFileAccess = SystemLocalImportFileAccess(),
 ) : MediaCacheEngine {
     companion object {
         val ENGINE_KEY = MediaCacheEngineKey("local-file-import")
@@ -42,10 +45,10 @@ class LocalImportMediaCacheEngine(
         parentContext: CoroutineContext,
     ): MediaCache? {
         val download = origin.download as? ResourceLocation.LocalFile ?: return null
-        val path = Path(download.filePath).inSystem
-        if (!path.exists()) {
+        if (!fileAccess.exists(download.filePath)) {
             return null
         }
+        val path = Path(download.filePath).inSystem
         return LocalFileMediaCache(
             origin = origin,
             metadata = metadata,

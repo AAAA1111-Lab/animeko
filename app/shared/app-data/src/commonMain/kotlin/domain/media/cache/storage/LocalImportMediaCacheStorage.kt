@@ -70,6 +70,8 @@ class LocalImportMediaCacheStorage(
         subjectNames: List<String>,
         items: List<LocalImportFileItem>,
     ): List<MediaCache> = withContext(Dispatchers.IO_) {
+        // Android 上导入的是 SAF content:// URI, 临时授权在应用重启后失效, 需要尽早持久化.
+        importEngine.fileAccess.persistReadPermissions(items.map { it.filePath })
         items.map { item ->
             val mediaId = "local-import-$subjectId-${item.episodeId}-${currentTimeMillis()}-${item.filename.hashCode()}"
             val media = DefaultMedia(
