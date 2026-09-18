@@ -58,6 +58,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.path
+import io.github.vinceglb.filekit.size
 import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.episode.displayName
 import me.him188.ani.app.domain.media.parser.EpisodeFilenameParser
@@ -111,7 +114,7 @@ fun LocalMediaImportDialog(
     val candidates = remember(files, episodes) {
         files.map { file ->
             val parsed = EpisodeFilenameParser.parse(file.name)
-            val path = file.toString().ifBlank { file.name }
+            val path = file.path.ifBlank { file.name }
             val size = try { file.size() } catch (e: Exception) { 0L }
             val matched = matchEpisode(parsed.episode)
             LocalImportCandidate(

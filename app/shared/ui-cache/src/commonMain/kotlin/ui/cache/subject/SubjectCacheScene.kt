@@ -354,7 +354,7 @@ class SubjectCacheViewModelImpl(
                         episodeSort = cache.metadata.episodeSort,
                         episodeEp = cache.metadata.episodeEp,
                         episodeName = epInfo?.displayName ?: cache.metadata.episodeName,
-                        filename = cache.media.originalTitle,
+                        filename = cache.origin.originalTitle,
                         fileSize = cache.fileStats.first().totalSize.inBytes,
                         fileHash = null,
                         videoDuration = Duration.ZERO,
