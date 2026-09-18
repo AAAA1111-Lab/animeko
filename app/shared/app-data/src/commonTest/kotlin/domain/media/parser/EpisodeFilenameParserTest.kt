@@ -104,7 +104,7 @@ class EpisodeFilenameParserTest {
     @Test
     fun testDecimalEpisode() {
         val res = EpisodeFilenameParser.parse("[VCB-Studio] Bocchi the Rock! - 08.5 [Ma10p_1080p].mkv")
-        assertEquals(EpisodeSort(8.5), res.episodeSort)
+        assertEquals(EpisodeSort("8.5"), res.episodeSort)
         assertEquals(8.5f, res.episodeNumber)
         assertTrue(res.isConfident)
     }

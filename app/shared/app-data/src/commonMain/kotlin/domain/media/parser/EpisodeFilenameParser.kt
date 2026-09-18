@@ -49,10 +49,11 @@ object EpisodeFilenameParser {
             season = sxxExxMatch.groupValues[1].toIntOrNull()
             epFloat = sxxExxMatch.groupValues[2].toFloatOrNull()
             if (epFloat != null) {
+                val epSort = if (epFloat % 1f == 0f) EpisodeSort(epFloat.toInt()) else EpisodeSort(epFloat.toString())
                 return ParsedEpisodeInfo(
                     rawFilename = filename,
                     season = season,
-                    episodeSort = EpisodeSort(epFloat),
+                    episodeSort = epSort,
                     episodeNumber = epFloat,
                     isConfident = true,
                 )
@@ -109,7 +110,9 @@ object EpisodeFilenameParser {
             }
         }
 
-        val epSort = epFloat?.let { EpisodeSort(it) }
+        val epSort = epFloat?.let { num ->
+            if (num % 1f == 0f) EpisodeSort(num.toInt()) else EpisodeSort(num.toString())
+        }
 
         return ParsedEpisodeInfo(
             rawFilename = filename,

@@ -22,6 +22,7 @@ import me.him188.ani.datasources.api.MediaProperties
 import me.him188.ani.datasources.api.source.MediaSourceKind
 import me.him188.ani.datasources.api.source.MediaSourceLocation
 import me.him188.ani.datasources.api.topic.EpisodeRange
+import me.him188.ani.datasources.api.topic.FileSize
 import me.him188.ani.datasources.api.topic.ResourceLocation
 import me.him188.ani.utils.coroutines.IO_
 import me.him188.ani.utils.platform.currentTimeMillis
@@ -34,6 +35,16 @@ data class LocalImportFileItem(
     val episodeSort: EpisodeSort,
     val episodeId: Int,
     val episodeTitle: String,
+)
+
+private val EmptyMediaProperties = MediaProperties(
+    subjectName = null,
+    episodeName = null,
+    subtitleLanguageIds = emptyList(),
+    resolution = "",
+    alliance = "",
+    size = FileSize.Zero,
+    subtitleKind = null,
 )
 
 class LocalImportMediaCacheStorage(
@@ -68,7 +79,10 @@ class LocalImportMediaCacheStorage(
                 download = ResourceLocation.LocalFile(item.filePath),
                 originalTitle = item.filename,
                 publishedTime = currentTimeMillis(),
-                properties = MediaProperties.EMPTY,
+                properties = EmptyMediaProperties.copy(
+                    subjectName = subjectNameCN,
+                    episodeName = item.episodeTitle,
+                ),
                 episodeRange = EpisodeRange.single(item.episodeSort),
                 location = MediaSourceLocation.Local,
                 kind = MediaSourceKind.LocalCache,
