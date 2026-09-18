@@ -31,6 +31,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FileOpen
+import androidx.compose.material.icons.rounded.FilePresent
+import androidx.compose.material.icons.rounded.VideoFile
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -63,9 +68,15 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.preference.MediaSelectorSettings
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.platform.LocalContext
 import me.him188.ani.app.platform.PermissionManager
 import me.him188.ani.app.ui.adaptive.AniTopAppBar
@@ -83,9 +94,14 @@ import me.him188.ani.app.ui.foundation.layout.plus
 import me.him188.ani.app.ui.foundation.navigation.BackHandler
 import me.him188.ani.app.ui.foundation.theme.AniThemeDefaults
 import me.him188.ani.app.ui.foundation.theme.appChromeHazeSource
+import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
 import me.him188.ani.app.ui.lang.cache_filter_collection_dropped
+import me.him188.ani.app.ui.lang.cache_import_local_media
+import me.him188.ani.app.ui.lang.cache_import_select_files
+import me.him188.ani.app.ui.lang.cache_import_select_folder
+import me.him188.ani.app.ui.lang.cache_import_success
 import me.him188.ani.app.ui.lang.cache_management_deselect_all
 import me.him188.ani.app.ui.lang.cache_management_downloading_count
 import me.him188.ani.app.ui.lang.cache_management_episode_label
@@ -102,6 +118,7 @@ import me.him188.ani.datasources.api.topic.FileSize
 import me.him188.ani.datasources.api.topic.FileSize.Companion.bytes
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
 import me.him188.ani.datasources.api.topic.isDoneOrDropped
+import me.him188.ani.utils.coroutines.IO_
 import org.jetbrains.compose.resources.stringResource
 import org.koin.mp.KoinPlatform
 
@@ -154,10 +171,12 @@ fun SubjectCacheScreen(
     navigationIcon: @Composable () -> Unit = {},
 ) {
     val cachedEpisodes by vm.cacheEpisodesFlow.collectAsStateWithLifecycle()
+    val allEpisodes by vm.allEpisodesFlow.collectAsStateWithLifecycle(emptyList())
     SubjectCachePage(
         title = vm.subjectTitle,
         cacheListState = vm.cacheListState,
         cachedEpisodes = cachedEpisodes,
+        allEpisodes = allEpisodes,
         mediaSourceInfoProvider = vm.mediaSourceInfoProvider,
         mediaSelectorSettingsProvider = { vm.mediaSelectorSettingsFlow },
         onPlay = onPlay,
@@ -167,6 +186,7 @@ fun SubjectCacheScreen(
         onViewDetail = { onNavigateCacheDetail(it.cacheId) },
         onPauseAll = { vm.pauseAllCaches() },
         onResumeAll = { vm.resumeAllCaches() },
+        onImportLocalFiles = { vm.importLocalFiles(it) },
         modifier = modifier,
         windowInsets = windowInsets,
         navigationIcon = navigationIcon,
@@ -193,6 +213,8 @@ fun SubjectCachePage(
     modifier: Modifier = Modifier,
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
     navigationIcon: @Composable () -> Unit = {},
+    allEpisodes: List<EpisodeInfo> = emptyList(),
+    onImportLocalFiles: (suspend (List<LocalImportFileItem>) -> Unit)? = null,
 ) {
     val selectionState = rememberCacheSelectionState()
 
@@ -295,6 +317,72 @@ fun SubjectCachePage(
                         )
                     },
                     navigationIcon = navigationIcon,
+                    actions = {
+                        if (onImportLocalFiles != null) {
+                            var showImportDialog by remember { mutableStateOf(false) }
+                            var candidateFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
+
+                            val toaster = LocalToaster.current
+                            val successTemplate = stringResource(Lang.cache_import_success)
+
+                            val videoExtensions = remember {
+                                listOf("mp4", "mkv", "avi", "flv", "ts", "webm", "mov", "m4v", "wmv", "rmvb")
+                            }
+
+                            val filePickerLauncher = rememberFilePickerLauncher(
+                                type = FileKitType.File(extensions = videoExtensions),
+                                mode = FileKitMode.Multiple(),
+                            ) { files ->
+                                if (!files.isNullOrEmpty()) {
+                                    candidateFiles = files
+                                    showImportDialog = true
+                                }
+                            }
+
+                            IconButton(onClick = { filePickerLauncher.launch() }) {
+                                Icon(
+                                    Icons.Rounded.FileOpen,
+                                    contentDescription = stringResource(Lang.cache_import_local_media),
+                                )
+                            }
+
+                            if (showImportDialog && candidateFiles.isNotEmpty()) {
+                                LocalMediaImportDialog(
+                                    files = candidateFiles,
+                                    episodes = allEpisodes,
+                                    subjectTitle = title,
+                                    onDismissRequest = {
+                                        showImportDialog = false
+                                        candidateFiles = emptyList()
+                                    },
+                                    onConfirm = { candidates ->
+                                        showImportDialog = false
+                                        val itemsToImport = candidates.mapNotNull { candidate ->
+                                            val ep = candidate.targetEpisode ?: return@mapNotNull null
+                                            LocalImportFileItem(
+                                                filePath = candidate.filePath,
+                                                filename = candidate.filename,
+                                                episodeSort = ep.sort,
+                                                episodeId = ep.episodeId,
+                                                episodeTitle = ep.displayName,
+                                            )
+                                        }
+                                        if (itemsToImport.isNotEmpty()) {
+                                            uiScope.launch {
+                                                onImportLocalFiles(itemsToImport)
+                                                toaster.show(
+                                                    successTemplate
+                                                        .replace("%1\$d", itemsToImport.size.toString())
+                                                        .replace("%d", itemsToImport.size.toString()),
+                                                )
+                                            }
+                                        }
+                                        candidateFiles = emptyList()
+                                    },
+                                )
+                            }
+                        }
+                    },
                     colors = appBarColors,
                     windowInsets = AniWindowInsets.forTopAppBarWithoutDesktopTitle(),
                     scrollBehavior = scrollBehavior,

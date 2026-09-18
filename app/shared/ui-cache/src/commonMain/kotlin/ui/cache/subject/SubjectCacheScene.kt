@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.episode.displayName
 import me.him188.ani.app.data.models.preference.MediaSelectorSettings
 import me.him188.ani.app.data.models.subject.nameCnOrName
@@ -49,6 +50,8 @@ import me.him188.ani.app.domain.media.cache.requester.CacheRequestStage
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequest
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequester
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequesterImpl
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
+import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
 import me.him188.ani.app.domain.media.resolver.toEpisodeMetadata
 import me.him188.ani.app.domain.media.selector.MediaSelectorFactory
@@ -105,6 +108,16 @@ interface SubjectCacheViewModel {
      * 继续该条目的所有已暂停缓存.
      */
     fun resumeAllCaches()
+
+    /**
+     * 该条目所有剧集信息流, 用于导入本地视频时的剧集匹配.
+     */
+    val allEpisodesFlow: Flow<List<EpisodeInfo>>
+
+    /**
+     * 导入本地视频文件为已完成缓存.
+     */
+    suspend fun importLocalFiles(items: List<LocalImportFileItem>)
 }
 
 @Stable
@@ -122,6 +135,7 @@ class SubjectCacheViewModelImpl(
     private val deleteCacheByEpisodeIdUseCase: DeleteCacheByEpisodeIdUseCase by inject()
     private val deleteCacheByCacheIdUseCase: DeleteCacheByCacheIdUseCase by inject()
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
+    private val localImportStorage: LocalImportMediaCacheStorage by inject()
 
     private val playbackHistoriesByEpisodeId = episodePlayHistoryRepository.flow
         .map { histories -> histories.associateBy { it.episodeId } }
@@ -309,6 +323,44 @@ class SubjectCacheViewModelImpl(
                 if (cache.state.first() == MediaCacheState.PAUSED) {
                     cache.resume()
                 }
+            }
+        }
+    }
+
+    override val allEpisodesFlow: Flow<List<EpisodeInfo>> =
+        episodeCollectionsFlow.map { list -> list.map { it.episodeInfo } }
+
+    override suspend fun importLocalFiles(items: List<LocalImportFileItem>) {
+        if (items.isEmpty()) return
+        val subjectInfo = subjectInfoFlow.first().subjectInfo
+        val caches = localImportStorage.importFiles(
+            subjectId = subjectId,
+            subjectNameCN = subjectInfo.nameCn.ifBlank { subjectInfo.name },
+            subjectNames = listOfNotNull(subjectInfo.nameCn, subjectInfo.name).distinct(),
+            items = items,
+        )
+        val episodeMap = episodeCollectionsFlow.first().associateBy { it.episodeId }
+        caches.forEach { cache ->
+            try {
+                val epId = cache.metadata.episodeId.toIntOrNull() ?: return@forEach
+                val epInfo = episodeMap[epId]?.episodeInfo
+                danmakuRepository.cacheDanmakuIfNeeded(
+                    DanmakuFetchRequest(
+                        subjectId = subjectInfo.subjectId,
+                        subjectPrimaryName = subjectInfo.displayName,
+                        subjectNames = subjectInfo.allNames,
+                        subjectPublishDate = subjectInfo.airDate,
+                        episodeId = epId,
+                        episodeSort = cache.metadata.episodeSort,
+                        episodeEp = cache.metadata.episodeEp,
+                        episodeName = epInfo?.displayName ?: cache.metadata.episodeName,
+                        filename = cache.media.originalTitle,
+                        fileSize = cache.fileStats.first().totalSize.inBytes,
+                        fileHash = null,
+                        videoDuration = Duration.ZERO,
+                    ),
+                )
+            } catch (_: Throwable) {
             }
         }
     }

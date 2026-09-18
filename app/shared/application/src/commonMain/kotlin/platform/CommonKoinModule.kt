@@ -119,6 +119,8 @@ import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistr
 import me.him188.ani.app.domain.media.cache.MediaCacheManager
 import me.him188.ani.app.domain.media.cache.MediaCacheManagerImpl
 import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.cache.engine.KtorPersistentHttpDownloader
 import me.him188.ani.app.domain.media.cache.engine.MediaCacheEngineKey
 import me.him188.ani.app.domain.media.cache.engine.TorrentMediaCacheEngine
@@ -478,14 +480,27 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         )
     }
 
+    single<LocalImportMediaCacheStorage> {
+        val id = MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID
+        val metadataStore = getContext().dataStores.mediaCacheMetadataStore
+        LocalImportMediaCacheStorage(
+            mediaSourceId = id,
+            datastore = metadataStore,
+            importEngine = LocalImportMediaCacheEngine(),
+            displayName = "LocalImport",
+            parentCoroutineContext = coroutineScope.childScopeContext(),
+        )
+    }
+
     // Media
     single<MediaCacheManager> {
         val id = MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID
         val engines = get<TorrentManager>().engines
         val metadataStore = getContext().dataStores.mediaCacheMetadataStore
+        val localImportStorage = get<LocalImportMediaCacheStorage>()
 
         MediaCacheManagerImpl(
-            storagesIncludingDisabled = buildList(capacity = engines.size) {
+            storagesIncludingDisabled = buildList(capacity = engines.size + 2) {
                 /*if (currentAniBuildConfig.isDebug) {
                     // 注意, 这个必须要在第一个, 见 [DefaultTorrentManager.engines] 注释
                     add(
@@ -531,6 +546,7 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
                         coroutineScope.childScopeContext(),
                     ),
                 )
+                add(localImportStorage)
             },
             backgroundScope = coroutineScope.childScope(),
         )
