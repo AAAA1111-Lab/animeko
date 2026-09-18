@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.VideoFile
 import androidx.compose.material3.AlertDialog
@@ -74,10 +73,7 @@ import me.him188.ani.app.ui.lang.cache_import_offset
 import me.him188.ani.app.ui.lang.cache_import_offset_apply
 import me.him188.ani.app.ui.lang.cache_import_offset_hint
 import me.him188.ani.app.ui.lang.cache_import_offset_title
-import me.him188.ani.app.ui.lang.cache_import_parsed_as
 import me.him188.ani.app.ui.lang.cache_import_rematch
-import me.him188.ani.app.ui.lang.cache_import_safe_hint
-import me.him188.ani.app.ui.lang.cache_import_unrecognized
 import me.him188.ani.datasources.api.topic.FileSize.Companion.bytes
 import org.jetbrains.compose.resources.stringResource
 
@@ -86,7 +82,6 @@ class LocalImportCandidate(
     val filePath: String,
     val filename: String,
     val fileSize: Long,
-    val detectedSeason: Int?,
     val detectedEpisode: Double?,
     initialTargetEpisode: EpisodeInfo?,
 ) {
@@ -122,7 +117,6 @@ fun LocalMediaImportDialog(
                 filePath = path,
                 filename = file.name,
                 fileSize = size,
-                detectedSeason = parsed.season,
                 detectedEpisode = parsed.episode,
                 initialTargetEpisode = matched,
             )
@@ -174,31 +168,6 @@ fun LocalMediaImportDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // Safe Hint banner
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Rounded.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(Lang.cache_import_safe_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
                 // Batch Tool bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -324,45 +293,12 @@ private fun CandidateItemCard(
                 }
             }
 
-            // Parsed detection tags & Episode selector
+            // Episode selector
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
             ) {
-                // Detection badge
-                val detectedText = if (candidate.detectedEpisode != null) {
-                    val epFormatted = if (candidate.detectedEpisode % 1.0 == 0.0) {
-                        candidate.detectedEpisode.toInt().toString()
-                    } else {
-                        candidate.detectedEpisode.toString()
-                    }
-                    val seasonText = if (candidate.detectedSeason != null) "S${candidate.detectedSeason} " else ""
-                    stringResource(Lang.cache_import_parsed_as, "$seasonText$epFormatted")
-                } else {
-                    stringResource(Lang.cache_import_unrecognized)
-                }
-
-                Surface(
-                    color = if (candidate.detectedEpisode != null) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    shape = RoundedCornerShape(4.dp),
-                ) {
-                    Text(
-                        text = detectedText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (candidate.detectedEpisode != null) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-
                 // Dropdown trigger button
                 Box {
                     Surface(

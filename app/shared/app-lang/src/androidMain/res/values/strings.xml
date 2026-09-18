@@ -839,14 +839,11 @@
     <string name="cache_import_confirm">Import (%1$d)</string>
     <string name="cache_import_cancel">Cancel</string>
     <string name="cache_import_ignore">Do not import</string>
-    <string name="cache_import_parsed_as">Detected: Ep. %1$s</string>
-    <string name="cache_import_unrecognized">Unrecognized</string>
     <string name="cache_import_empty_hint">No video files selected</string>
     <string name="cache_import_success">Imported %1$d local videos</string>
     <string name="cache_import_offset_title">Shift Episode Number</string>
     <string name="cache_import_offset_apply">Apply</string>
     <string name="cache_import_offset_hint">Offset (e.g. 12 or -12)</string>
-    <string name="cache_import_safe_hint">Linked directly without copying. Removing cache will NOT delete your original files.</string>
     <string name="cache_management_selection_downloading_count">incl. %1$d downloading</string>
     <string name="cache_management_select_all_action">Select all</string>
     <string name="cache_management_deselect_all">Deselect all</string>

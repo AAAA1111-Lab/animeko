@@ -879,14 +879,11 @@
     <string name="cache_import_confirm">确认导入 (%1$d)</string>
     <string name="cache_import_cancel">取消</string>
     <string name="cache_import_ignore">不导入</string>
-    <string name="cache_import_parsed_as">识别为: 第 %1$s 集</string>
-    <string name="cache_import_unrecognized">未能识别集数</string>
     <string name="cache_import_empty_hint">未选择可导入的视频文件</string>
     <string name="cache_import_success">已成功导入 %1$d 个本地视频</string>
     <string name="cache_import_offset_title">批量偏移集数</string>
     <string name="cache_import_offset_apply">应用</string>
     <string name="cache_import_offset_hint">偏移量 (例如 12 或 -12)</string>
-    <string name="cache_import_safe_hint">采用原路径软引用，零额外占用；在应用内删除缓存不会删除磁盘原视频。</string>
     <string name="cache_management_selection_downloading_count">含 %1$d 个下载中</string>
     <string name="cache_management_select_all_action">全选</string>
     <string name="cache_management_deselect_all">取消全选</string>
