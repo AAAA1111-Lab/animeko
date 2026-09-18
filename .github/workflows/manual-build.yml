@@ -165,7 +165,7 @@ jobs:
         run: |
           CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
           if [ -z "$CODE_VERSION" ]; then
-            CODE_VERSION="6.2.0-alpha01"
+            CODE_VERSION="6.2.0.1-alpha01"
           fi
 
           TAG="${{ inputs.release_tag }}"
