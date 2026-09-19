@@ -12,6 +12,8 @@ package me.him188.ani.app.ui.cache
 import androidx.compose.runtime.Stable
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
@@ -23,7 +25,6 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.data.network.AniSubjectSearchService
@@ -45,6 +46,8 @@ import me.him188.ani.app.ui.cache.components.allCachesWithEngineFlow
 import me.him188.ani.app.ui.cache.components.createCacheEpisodeStateFlow
 import me.him188.ani.app.ui.foundation.AbstractViewModel
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
+import me.him188.ani.datasources.bangumi.apis.DefaultApi
+import me.him188.ani.datasources.bangumi.models.BangumiSearchSubjectsRequest
 import me.him188.ani.utils.coroutines.flows.flowOfEmptyList
 import me.him188.ani.utils.coroutines.sampleWithInitial
 import org.koin.core.component.KoinComponent
@@ -159,35 +162,38 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
             .cachedIn(backgroundScope)
 
     /**
-     * 本地导入 (自动匹配): 按关键词搜索条目, 返回候选列表.
+     * 本地导入 (自动匹配): 同时搜索 Ani 服务器与 Bangumi (bgm.tv), 合并去重后返回候选列表.
      *
-     * 罗马音标题常含虚词 (如 "Ruri no Houseki"), 搜索按分词 AND 匹配时虚词会导致零结果;
-     * 首次搜索为空时去除虚词重试一次.
+     * Bangumi 官方搜索对罗马音的匹配通常好于 Ani 服务器, 两者互为补充.
      */
-    suspend fun searchSubjectsForImport(keywords: String): List<SubjectInfo> {
-        val primary = runCatching { searchOnce(keywords) }.getOrDefault(emptyList())
-        if (primary.isNotEmpty()) return primary
-
-        val simplified = keywords.split(' ')
-            .filter { it.isNotBlank() && it.lowercase() !in ROMAJI_PARTICLES }
-            .joinToString(" ")
-            .trim()
-        if (simplified.isEmpty() || simplified == keywords) return emptyList()
-        return runCatching { searchOnce(simplified) }.getOrDefault(emptyList())
+    suspend fun searchSubjectsForImport(keywords: String): List<ImportSubjectCandidate> = coroutineScope {
+        val ani = async { runCatching { searchAni(keywords) }.getOrDefault(emptyList()) }
+        val bangumi = async { runCatching { searchBangumi(keywords) }.getOrDefault(emptyList()) }
+        (ani.await() + bangumi.await()).distinctBy { it.subjectId }
     }
 
-    private suspend fun searchOnce(keywords: String): List<SubjectInfo> =
-        subjectSearchService.searchSubjects(keywords, limit = 20).map { it.subjectInfo }
+    private suspend fun searchAni(keywords: String): List<ImportSubjectCandidate> =
+        subjectSearchService.searchSubjects(keywords, limit = 20)
+            .map { ImportSubjectCandidate(it.subjectId, it.displayName, it.imageLarge) }
 
-    private companion object {
-        val ROMAJI_PARTICLES = setOf("no", "wa", "ni", "ga", "wo", "o", "de", "to", "na")
-    }
+    private suspend fun searchBangumi(keywords: String): List<ImportSubjectCandidate> =
+        bangumiSearchApi.searchSubjects(
+            limit = 20,
+            bangumiSearchSubjectsRequest = BangumiSearchSubjectsRequest(keyword = keywords),
+        ).body().data.map {
+            ImportSubjectCandidate(
+                subjectId = it.id,
+                displayName = it.nameCn.ifBlank { it.name },
+                imageUrl = it.image,
+            )
+        }
 
     /**
-     * 本地导入: 加载条目的全部剧集, 用于文件与剧集的匹配.
+     * 本地导入: 加载条目的完整信息 (含剧集列表), 用于剧集匹配与导入.
+     * 对未收藏的条目同样可用 (会自动从服务器获取并缓存).
      */
-    suspend fun loadEpisodesForImport(subjectId: Int): List<EpisodeInfo> {
-        return subjectRepository.subjectCollectionFlow(subjectId).first().episodes.map { it.episodeInfo }
+    suspend fun loadSubjectForImport(subjectId: Int): SubjectCollectionInfo {
+        return subjectRepository.subjectCollectionFlow(subjectId).first()
     }
 
     /**
@@ -200,6 +206,15 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
         return importLocalVideosUseCase.import(subjectInfo, items)
     }
 }
+
+/**
+ * 本地导入的条目候选 (来自搜索结果或收藏列表).
+ */
+data class ImportSubjectCandidate(
+    val subjectId: Int,
+    val displayName: String,
+    val imageUrl: String?,
+)
 
 internal fun Flow<List<MediaCacheStorage>>.overallStatsFlow(): Flow<MediaStats> {
     return flatMapLatest { storages ->

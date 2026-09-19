@@ -83,9 +83,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import kotlinx.coroutines.launch
-import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.episode.displayName
-import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.domain.media.cache.engine.MediaStats
 import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.domain.media.parser.EpisodeFilenameParser
@@ -199,7 +197,8 @@ fun CacheManagementScreen(
     var showImportModeChooser by remember { mutableStateOf(false) }
     var showImportCollectionPicker by remember { mutableStateOf(false) }
     var showImportSearchPicker by remember { mutableStateOf(false) }
-    var importSubjectInfo by remember { mutableStateOf<SubjectInfo?>(null) }
+    var importSubjectCandidate by remember { mutableStateOf<ImportSubjectCandidate?>(null) }
+    var importSubjectInfo by remember { mutableStateOf<SubjectCollectionInfo?>(null) }
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val importSuccessTemplate = stringResource(Lang.cache_import_success)
@@ -245,7 +244,11 @@ fun CacheManagementScreen(
             onDismiss = { dismissImportDialogs() },
             onSelect = {
                 showImportCollectionPicker = false
-                importSubjectInfo = it.subjectInfo
+                importSubjectCandidate = ImportSubjectCandidate(
+                    it.subjectId,
+                    it.subjectInfo.displayName,
+                    it.subjectInfo.imageLarge,
+                )
             },
         )
     }
@@ -260,7 +263,7 @@ fun CacheManagementScreen(
             onDismiss = { dismissImportDialogs() },
             onSelect = {
                 showImportSearchPicker = false
-                importSubjectInfo = it
+                importSubjectCandidate = it
             },
             onManualFallback = {
                 showImportSearchPicker = false
@@ -269,14 +272,14 @@ fun CacheManagementScreen(
         )
     }
 
-    importSubjectInfo?.let { subject ->
-        val importEpisodes by produceState<List<EpisodeInfo>?>(null, subject.subjectId) {
-            value = runCatching { vm.loadEpisodesForImport(subject.subjectId) }.getOrNull()
+    importSubjectCandidate?.let { candidate ->
+        val loadedSubject by produceState<SubjectCollectionInfo?>(null, candidate.subjectId) {
+            value = runCatching { vm.loadSubjectForImport(candidate.subjectId) }.getOrNull()
         }
-        when (val episodes = importEpisodes) {
+        when (val subject = loadedSubject) {
             null -> AlertDialog(
-                onDismissRequest = { importSubjectInfo = null },
-                title = { Text(subject.displayName) },
+                onDismissRequest = { importSubjectCandidate = null },
+                title = { Text(candidate.displayName) },
                 text = {
                     Box(
                         Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -290,19 +293,21 @@ fun CacheManagementScreen(
 
             else -> LocalMediaImportDialog(
                 files = importCandidateFiles,
-                episodes = episodes,
-                subjectTitle = subject.displayName,
+                episodes = subject.episodes.map { it.episodeInfo },
+                subjectTitle = subject.subjectInfo.displayName,
                 onDismissRequest = {
+                    importSubjectCandidate = null
                     importSubjectInfo = null
                     importCandidateFiles = emptyList()
                 },
                 onConfirm = { candidates ->
+                    importSubjectCandidate = null
                     importSubjectInfo = null
-                    val items = candidates.mapNotNull { candidate ->
-                        val ep = candidate.targetEpisode ?: return@mapNotNull null
+                    val items = candidates.mapNotNull { c ->
+                        val ep = c.targetEpisode ?: return@mapNotNull null
                         LocalImportFileItem(
-                            filePath = candidate.filePath,
-                            filename = candidate.filename,
+                            filePath = c.filePath,
+                            filename = c.filename,
                             episodeSort = ep.sort,
                             episodeId = ep.episodeId,
                             episodeTitle = ep.displayName,
@@ -310,7 +315,7 @@ fun CacheManagementScreen(
                     }
                     if (items.isEmpty()) return@LocalMediaImportDialog
                     scope.launch {
-                        val importedCount = vm.importLocalFiles(subject, items)
+                        val importedCount = vm.importLocalFiles(subject.subjectInfo, items)
                         toaster.show(
                             if (importedCount > 0) {
                                 importSuccessTemplate

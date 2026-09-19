@@ -9,6 +9,7 @@
 
 package me.him188.ani.app.ui.cache
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.ui.subject.SubjectCoverCard
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_import_auto_no_result
@@ -131,13 +131,13 @@ private fun ImportModeOption(
 @Composable
 internal fun ImportSubjectSearchDialog(
     initialKeywords: String?,
-    onSearch: suspend (String) -> List<SubjectInfo>,
+    onSearch: suspend (String) -> List<ImportSubjectCandidate>,
     onDismiss: () -> Unit,
-    onSelect: (SubjectInfo) -> Unit,
+    onSelect: (ImportSubjectCandidate) -> Unit,
     onManualFallback: () -> Unit,
 ) {
     var query by remember { mutableStateOf(initialKeywords ?: "") }
-    var searchResults by remember { mutableStateOf<List<SubjectInfo>?>(null) } // null = 搜索中
+    var searchResults by remember { mutableStateOf<List<ImportSubjectCandidate>?>(null) } // null = 搜索中
     val scope = rememberCoroutineScope()
 
     fun startSearch(keywords: String) {
@@ -218,7 +218,7 @@ internal fun ImportSubjectSearchDialog(
                                 val subject = results[index]
                                 SubjectCoverCard(
                                     name = subject.displayName,
-                                    image = subject.imageLarge,
+                                    image = subject.imageUrl,
                                     isPlaceholder = false,
                                     onClick = { onSelect(subject) },
                                 )
