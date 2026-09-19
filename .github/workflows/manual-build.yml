@@ -185,7 +185,6 @@ jobs:
         id: meta
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
           if [ -z "$CODE_VERSION" ]; then
@@ -195,12 +194,6 @@ jobs:
           TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
             TAG="v${CODE_VERSION}"
-          fi
-
-          # 不覆盖已存在的 Release: 版本号重复时直接失败, 提示更换版本号.
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release ${TAG} 已存在, 不能覆盖. 请更换发布版本号, 或删除旧 Release 后重试." >&2
-            exit 1
           fi
 
           VERSION="${TAG#v}"
@@ -214,19 +207,9 @@ jobs:
             NAME="$TAG"
           fi
 
-          if git log -1 --pretty=%s | grep -qi "合并主线"; then
-            BODY="合并主线 ${VERSION} 更新"
-          else
-            BODY=$(printf "%s\n%s\n%s\n%s\n%s" \
-              "### 更新内容" \
-              "- 移除应用内推广卡片与外链广告" \
-              "- Jellyfin 媒体源支持自定义显示名称与多实例隔离" \
-              "- 修复 Android 端全屏播放内嵌 ASS 字幕拉伸异常" \
-              "- 内置长期固定签名证书，支持后续直接覆盖安装")
-          fi
-
+          BODY=""
           if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
-            BODY=$(printf "%s\n%s" "$BODY" "Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置")
+            BODY="Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置"
           fi
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -254,7 +237,7 @@ jobs:
           fi
           ls -lh release-files
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
