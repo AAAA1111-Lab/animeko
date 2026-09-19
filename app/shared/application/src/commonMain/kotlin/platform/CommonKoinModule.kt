@@ -29,6 +29,7 @@ import me.him188.ani.app.data.network.AniEpisodeCommentService
 import me.him188.ani.app.data.network.AniPersonCommentService
 import me.him188.ani.app.data.network.AniSubjectRelationIndexService
 import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.AnimeScheduleService
 import me.him188.ani.app.data.network.AutoSkipRepository
 import me.him188.ani.app.data.network.BangumiBangumiCommentServiceImpl
@@ -319,10 +320,14 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
             subjectApi = aniApiProvider.subjectApi,
         )
     }
+    single {
+        BangumiSearchService()
+    }
     single<SubjectSearchRepository> {
         SubjectSearchRepository(
             aniSubjectSearchService = get(),
             subjectCollectionRepository = get(),
+            bangumiSearchService = get(),
         )
     }
     single<SubjectSearchCompletionRepository> {

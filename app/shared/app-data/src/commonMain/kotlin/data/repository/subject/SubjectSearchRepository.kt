@@ -22,6 +22,8 @@ import kotlinx.coroutines.withContext
 import me.him188.ani.app.data.models.schedule.AnimeSeasonId
 import me.him188.ani.app.data.models.schedule.yearMonths
 import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
+import me.him188.ani.app.data.network.BangumiSubjectSearchResult
 import me.him188.ani.app.data.network.BatchSubjectDetails
 import me.him188.ani.app.data.network.SubjectSearchField
 import me.him188.ani.app.data.network.SubjectSearchFilters
@@ -37,6 +39,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class SubjectSearchRepository(
     private val aniSubjectSearchService: AniSubjectSearchService,
     private val subjectCollectionRepository: SubjectCollectionRepository,
+    private val bangumiSearchService: BangumiSearchService,
     defaultDispatcher: CoroutineContext = Dispatchers.Default,
 ) : Repository(defaultDispatcher) {
 
@@ -56,6 +59,15 @@ class SubjectSearchRepository(
             SubjectSearchPagingSource(ignoreDoneAndDropped, searchQuery)
         },
     ).flow.flowOn(defaultDispatcher)
+
+    /**
+     * 使用 Bangumi 官方搜索接口搜索条目.
+     *
+     * 对罗马音等关键词的匹配通常好于 [searchSubjects] (Ani 服务器按分词 AND 匹配).
+     * 匿名调用, 无需登录. 仅作为辅助/兜底数据源, 不参与缓存选择器.
+     */
+    suspend fun searchSubjectsOnBangumi(keywords: String, limit: Int = 20): List<BangumiSubjectSearchResult> =
+        bangumiSearchService.searchSubjects(keywords, limit)
 
     private inner class SubjectSearchPagingSource(
         private val ignoreDoneAndDropped: suspend () -> Boolean,

@@ -12,8 +12,6 @@ package me.him188.ani.app.ui.cache
 import androidx.compose.runtime.Stable
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import io.ktor.client.call.body
-import io.ktor.client.plugins.userAgent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +28,7 @@ import kotlinx.coroutines.supervisorScope
 import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
 import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
@@ -48,8 +47,6 @@ import me.him188.ani.app.ui.cache.components.allCachesWithEngineFlow
 import me.him188.ani.app.ui.cache.components.createCacheEpisodeStateFlow
 import me.him188.ani.app.ui.foundation.AbstractViewModel
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
-import me.him188.ani.datasources.bangumi.apis.DefaultApi
-import me.him188.ani.datasources.bangumi.models.BangumiSearchSubjectsRequest
 import me.him188.ani.utils.coroutines.flows.flowOfEmptyList
 import me.him188.ani.utils.coroutines.sampleWithInitial
 import org.koin.core.component.KoinComponent
@@ -184,27 +181,9 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
                 )
             }
 
-    private val bangumiSearchApi: DefaultApi by lazy {
-        // bgm.tv 强制要求 User-Agent, 缺失时请求会被拒绝.
-        DefaultApi(
-            baseUrl = "https://api.bgm.tv",
-            httpClientConfig = { config ->
-                config.userAgent("Animeko-LocalImport/1.0")
-            },
-        )
-    }
-
     private suspend fun searchBangumi(keywords: String): List<ImportSubjectCandidate> =
-        bangumiSearchApi.searchSubjects(
-            limit = 20,
-            bangumiSearchSubjectsRequest = BangumiSearchSubjectsRequest(keyword = keywords),
-        ).body().data.orEmpty().map {
-            ImportSubjectCandidate(
-                subjectId = it.id,
-                displayName = it.nameCn.ifBlank { it.name },
-                imageUrl = it.image,
-            )
-        }
+        bangumiSearchService.searchSubjects(keywords)
+            .map { ImportSubjectCandidate(it.subjectId, it.nameCn.ifBlank { it.name }, it.imageUrl) }
 
     /**
      * 本地导入: 加载条目的完整信息 (含剧集列表), 用于剧集匹配与导入.
