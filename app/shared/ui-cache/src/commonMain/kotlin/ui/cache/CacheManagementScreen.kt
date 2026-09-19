@@ -113,6 +113,8 @@ import me.him188.ani.app.ui.lang.cache_episode_pause_download
 import me.him188.ani.app.ui.lang.cache_episode_resume_download
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_confirmation
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_title
+import me.him188.ani.app.ui.lang.cache_management_delete_local_import_confirmation
+import me.him188.ani.app.ui.lang.cache_management_delete_local_import_mixed_hint
 import me.him188.ani.app.ui.lang.cache_management_enter_selection_mode
 import me.him188.ani.app.ui.lang.cache_management_exit_selection
 import me.him188.ani.app.ui.lang.cache_management_invalid_cache_info
@@ -287,7 +289,7 @@ fun CacheManagementScreen(
     if (deleteSelectedCacheDialog) {
         DeleteActionDialog(
             onDismiss = { deleteSelectedCacheDialog = false },
-            containsLocalImport = selectedEntries.any { it.isLocalImport },
+            confirmationKind = selectedEntries.deleteConfirmationKind(),
             onConfirm = {
                 selectionEntries.filter { it.cacheId in selectionState.selectedIds }
                     .forEach { onDelete(it) }
@@ -745,22 +747,52 @@ object CacheManagementTestTags {
     const val DELETE_CONFIRM_BUTTON = "cache_management_delete_confirm_button"
 }
 
+/**
+ * 删除确认的类型, 决定确认对话框的文案.
+ */
+internal enum class DeleteConfirmationKind {
+    /** 仅真缓存 (BT/网页等): 删除后不可恢复. */
+    REAL_CACHE_ONLY,
+
+    /** 仅本地导入: 软引用磁盘原文件, 删除不会影响原文件. */
+    LOCAL_IMPORT_ONLY,
+
+    /** 真缓存与本地导入混合. */
+    MIXED,
+}
+
+internal fun List<CacheEpisodeState>.deleteConfirmationKind(): DeleteConfirmationKind {
+    val hasLocalImport = any { it.isLocalImport }
+    val hasRealCache = any { !it.isLocalImport }
+    return when {
+        hasLocalImport && hasRealCache -> DeleteConfirmationKind.MIXED
+        hasLocalImport -> DeleteConfirmationKind.LOCAL_IMPORT_ONLY
+        else -> DeleteConfirmationKind.REAL_CACHE_ONLY
+    }
+}
+
 @Composable
 internal fun DeleteActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    containsLocalImport: Boolean = false,
+    confirmationKind: DeleteConfirmationKind,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
         title = { Text(stringResource(Lang.cache_management_delete_cache_title)) },
         text = {
-            Column {
-                Text(stringResource(Lang.cache_management_delete_cache_confirmation))
-                if (containsLocalImport) {
+            when (confirmationKind) {
+                DeleteConfirmationKind.REAL_CACHE_ONLY ->
+                    Text(stringResource(Lang.cache_management_delete_cache_confirmation))
+
+                DeleteConfirmationKind.LOCAL_IMPORT_ONLY ->
+                    Text(stringResource(Lang.cache_management_delete_local_import_confirmation))
+
+                DeleteConfirmationKind.MIXED -> Column {
+                    Text(stringResource(Lang.cache_management_delete_cache_confirmation))
                     Text(
-                        stringResource(Lang.cache_management_delete_local_import_hint),
+                        stringResource(Lang.cache_management_delete_local_import_mixed_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

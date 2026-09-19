@@ -83,6 +83,7 @@ import me.him188.ani.app.platform.PermissionManager
 import me.him188.ani.app.ui.adaptive.AniTopAppBar
 import me.him188.ani.app.ui.adaptive.AniTopAppBarDefaults
 import me.him188.ani.app.ui.cache.DeleteActionDialog
+import me.him188.ani.app.ui.cache.deleteConfirmationKind
 import me.him188.ani.app.ui.cache.components.CacheEpisodeRow
 import me.him188.ani.app.ui.cache.components.CacheEpisodeState
 import me.him188.ani.app.ui.cache.components.CacheSelectionFloatingToolbar
@@ -242,7 +243,7 @@ fun SubjectCachePage(
     if (showDeleteSelectedDialog) {
         DeleteActionDialog(
             onDismiss = { showDeleteSelectedDialog = false },
-            containsLocalImport = selectedEntries.any { it.isLocalImport },
+            confirmationKind = selectedEntries.deleteConfirmationKind(),
             onConfirm = {
                 selectedEntries.forEach(onDelete)
                 selectionState.clear()

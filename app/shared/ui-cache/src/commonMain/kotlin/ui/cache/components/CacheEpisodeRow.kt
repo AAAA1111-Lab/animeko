@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import me.him188.ani.app.tools.getOrZero
 import me.him188.ani.app.ui.cache.CacheActionDropdown
 import me.him188.ani.app.ui.cache.DeleteActionDialog
+import me.him188.ani.app.ui.cache.deleteConfirmationKind
 import me.him188.ani.app.ui.foundation.animation.AniAnimatedVisibility
 import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
@@ -99,7 +100,7 @@ fun CacheEpisodeRow(
     if (showConfirmDelete) {
         DeleteActionDialog(
             onDismiss = { showConfirmDelete = false },
-            containsLocalImport = episode.isLocalImport,
+            confirmationKind = listOf(episode).deleteConfirmationKind(),
             onConfirm = {
                 onDelete()
                 showConfirmDelete = false

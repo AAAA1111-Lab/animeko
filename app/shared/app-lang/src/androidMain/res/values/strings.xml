@@ -846,7 +846,8 @@
     <string name="cache_import_offset_apply">Apply</string>
     <string name="cache_import_offset_hint">Offset (e.g. 12 or -12)</string>
     <string name="cache_management_selection_downloading_count">incl. %1$d downloading</string>
-    <string name="cache_management_delete_local_import_hint">This will not delete the local video files</string>
+    <string name="cache_management_delete_local_import_confirmation">This will not delete the imported local files</string>
+    <string name="cache_management_delete_local_import_mixed_hint">(Imported local files will not be deleted)</string>
     <string name="cache_management_select_all_action">Select all</string>
     <string name="cache_management_deselect_all">Deselect all</string>
     <string name="cache_episode_status_paused">Paused</string>
