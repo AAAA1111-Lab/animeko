@@ -136,7 +136,16 @@ class EpisodeFilenameParserTest {
     }
 
     @Test
-    fun testGuessTitleReturnsNullWhenNothingLeft() {
-        assertEquals(null, EpisodeFilenameParser.guessTitle("[Group][Only][Brackets].mkv"))
+    fun testGuessTitleFromBracketContents() {
+        val title = EpisodeFilenameParser.guessTitle(
+            "[DBD-Raws][Steins;Gate 0][01][1080P][BDRip][HEVC-10bit][FLAC]",
+        )
+        assertEquals("Steins;Gate 0", title)
+    }
+
+    @Test
+    fun testGuessTitleAllBracketsUsesSecondBracket() {
+        val title = EpisodeFilenameParser.guessTitle("[Group][Only][Brackets].mkv")
+        assertEquals("Only", title)
     }
 }

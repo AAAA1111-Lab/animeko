@@ -9,7 +9,6 @@
 
 package me.him188.ani.app.ui.cache
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +16,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Search
@@ -45,7 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.him188.ani.app.data.models.subject.SubjectInfo
-import me.him188.ani.app.ui.foundation.AsyncImage
+import me.him188.ani.app.ui.subject.SubjectCoverCard
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_import_auto_no_result
 import me.him188.ani.app.ui.lang.cache_import_cancel
@@ -204,15 +203,23 @@ internal fun ImportSubjectSearchDialog(
                             }
                         }
 
-                        else -> Column(
+                        else -> LazyVerticalGrid(
+                            GridCells.Adaptive(120.dp),
                             Modifier
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                                .fillMaxWidth()
+                                .height(360.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            results.forEach { subject ->
-                                ImportSubjectCardRow(
-                                    displayName = subject.displayName,
-                                    imageUrl = subject.imageLarge,
+                            items(
+                                count = results.size,
+                                key = { results[it].subjectId },
+                            ) { index ->
+                                val subject = results[index]
+                                SubjectCoverCard(
+                                    name = subject.displayName,
+                                    image = subject.imageLarge,
+                                    isPlaceholder = false,
                                     onClick = { onSelect(subject) },
                                 )
                             }

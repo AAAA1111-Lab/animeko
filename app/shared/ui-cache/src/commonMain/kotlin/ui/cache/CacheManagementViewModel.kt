@@ -160,9 +160,27 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
 
     /**
      * 本地导入 (自动匹配): 按关键词搜索条目, 返回候选列表.
+     *
+     * 罗马音标题常含虚词 (如 "Ruri no Houseki"), 搜索按分词 AND 匹配时虚词会导致零结果;
+     * 首次搜索为空时去除虚词重试一次.
      */
     suspend fun searchSubjectsForImport(keywords: String): List<SubjectInfo> {
-        return subjectSearchService.searchSubjects(keywords, limit = 20).map { it.subjectInfo }
+        val primary = runCatching { searchOnce(keywords) }.getOrDefault(emptyList())
+        if (primary.isNotEmpty()) return primary
+
+        val simplified = keywords.split(' ')
+            .filter { it.isNotBlank() && it.lowercase() !in ROMAJI_PARTICLES }
+            .joinToString(" ")
+            .trim()
+        if (simplified.isEmpty() || simplified == keywords) return emptyList()
+        return runCatching { searchOnce(simplified) }.getOrDefault(emptyList())
+    }
+
+    private suspend fun searchOnce(keywords: String): List<SubjectInfo> =
+        subjectSearchService.searchSubjects(keywords, limit = 20).map { it.subjectInfo }
+
+    private companion object {
+        val ROMAJI_PARTICLES = setOf("no", "wa", "ni", "ga", "wo", "o", "de", "to", "na")
     }
 
     /**

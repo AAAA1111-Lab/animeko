@@ -144,16 +144,27 @@ object EpisodeFilenameParser {
      * 从文件名中猜测作品标题, 用于自动剧集匹配 (刮削): 将猜测的标题用于搜索条目.
      *
      * 处理: 去扩展名 -> 去所有括号段 (字幕组/标签) -> 去分辨率/编码等噪声词与集数标记 -> 修剪分隔符.
-     * 若去除括号后为空 (例如 "[Group] Title"), 则取最后一个 ']' 或 '】' 之后的内容作为主体.
+     * 若去除括号后为空 (例如 "[Group][Title][01]" 整个文件名都在括号内), 则依次尝试各括号的内容,
+     * 跳过第一个括号 (通常为字幕组); 最后再尝试最后一个 ']' 之后的内容.
      *
      * @return 猜测的标题; 无法提取时为 null.
      */
     fun guessTitle(filename: String): String? {
         val withoutExt = filename.replace(VIDEO_EXT_REGEX, "")
+            .replace('【', '[')
+            .replace('】', ']')
+        val bracketContents = Regex("""\[([^\]]*)]""").findAll(withoutExt).map { it.groupValues[1] }.toList()
 
         val candidates = buildList {
+            // 1. 去除所有括号后的主体文本 (如 "[Group] Title - 01" -> "Title - 01")
             add(withoutExt.replace(BRACKETS_REGEX, " "))
-            val lastBracketEnd = withoutExt.indexOfLast { it == ']' || it == '】' }
+            // 2. 去括号后为空时, 整个文件名都由括号组成: 依次尝试各括号内容,
+            //    跳过第一个括号 (通常为字幕组), 如 "[DBD-Raws][Steins;Gate 0][01]" -> "Steins;Gate 0"
+            if (bracketContents.size >= 2) {
+                addAll(bracketContents.drop(1))
+            }
+            // 3. 最后一个 ']' 之后的内容 (如 "[Group] Title - 01" 变体)
+            val lastBracketEnd = withoutExt.indexOfLast { it == ']' }
             if (lastBracketEnd in 0 until withoutExt.length - 1) {
                 add(withoutExt.substring(lastBracketEnd + 1))
             }
@@ -171,7 +182,7 @@ object EpisodeFilenameParser {
                 .replace(DELIMITED_EP_REGEX, " ")
                 .replace(WHITESPACE_REGEX, " ")
                 .trim(' ', '-', '_', '.', '~')
-            if (cleaned.length >= 2) {
+            if (cleaned.length >= 2 && cleaned.any { it.isLetter() }) {
                 return cleaned
             }
         }
