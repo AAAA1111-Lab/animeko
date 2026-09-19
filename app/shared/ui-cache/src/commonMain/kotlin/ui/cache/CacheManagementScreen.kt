@@ -465,7 +465,11 @@ fun CacheManagementScreen(
         val listBottomPadding = PaddingValues(bottom = paddingValues.calculateBottomPadding())
         val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
         val paneExtraPadding = windowSizeClass.paneHorizontalPadding
+        // 宽屏下左栏列表默认占窗口 40% (M3 规范的 412dp 在大屏上过于局促, 右栏详情会大面积留白);
+        // 用户仍可通过中间的拖动手柄自行调整.
+        val listPanePreferredWidth = (windowSizeClass.maxWidthDp * 0.4f).dp.coerceIn(412.dp, 760.dp)
         AniListDetailPaneScaffold(
+            listPanePreferredWidth = listPanePreferredWidth,
             // 毛玻璃 app chrome 的模糊来源.
             modifier = Modifier
                 .appChromeHazeSource(backgroundColor = AniThemeDefaults.pageContentBackgroundColor)
