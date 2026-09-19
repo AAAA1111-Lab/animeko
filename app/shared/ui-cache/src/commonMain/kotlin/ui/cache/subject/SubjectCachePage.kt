@@ -99,6 +99,7 @@ import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
 import me.him188.ani.app.ui.lang.cache_filter_collection_dropped
+import me.him188.ani.app.ui.lang.cache_import_already_imported
 import me.him188.ani.app.ui.lang.cache_import_local_media
 import me.him188.ani.app.ui.lang.cache_import_select_files
 import me.him188.ani.app.ui.lang.cache_import_select_folder
@@ -215,7 +216,7 @@ fun SubjectCachePage(
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
     navigationIcon: @Composable () -> Unit = {},
     allEpisodes: List<EpisodeInfo> = emptyList(),
-    onImportLocalFiles: (suspend (List<LocalImportFileItem>) -> Unit)? = null,
+    onImportLocalFiles: (suspend (List<LocalImportFileItem>) -> Int)? = null,
 ) {
     val selectionState = rememberCacheSelectionState()
 
@@ -325,6 +326,7 @@ fun SubjectCachePage(
 
                             val toaster = LocalToaster.current
                             val successTemplate = stringResource(Lang.cache_import_success)
+                            val alreadyImportedText = stringResource(Lang.cache_import_already_imported)
 
                             val videoExtensions = remember {
                                 listOf("mp4", "mkv", "avi", "flv", "ts", "webm", "mov", "m4v", "wmv", "rmvb")
@@ -370,11 +372,15 @@ fun SubjectCachePage(
                                         }
                                         if (itemsToImport.isNotEmpty()) {
                                             uiScope.launch {
-                                                onImportLocalFiles(itemsToImport)
+                                                val importedCount = onImportLocalFiles(itemsToImport)
                                                 toaster.show(
-                                                    successTemplate
-                                                        .replace("%1\$d", itemsToImport.size.toString())
-                                                        .replace("%d", itemsToImport.size.toString()),
+                                                    if (importedCount > 0) {
+                                                        successTemplate
+                                                            .replace("%1\$d", importedCount.toString())
+                                                            .replace("%d", importedCount.toString())
+                                                    } else {
+                                                        alreadyImportedText
+                                                    },
                                                 )
                                             }
                                         }

@@ -64,6 +64,15 @@ class LocalImportMediaCacheStorage(
         refreshCache()
     }
 
+    /**
+     * 导入本地视频文件为已完成缓存. 每一集只保留一个导入缓存:
+     * - 重复导入同一个文件: 跳过, 并清理旧版本残留的同一文件的重复缓存;
+     * - 同一集导入了不同的文件: 替换该集的全部旧缓存.
+     *
+     * 导入是软引用, 删除应用内缓存不会删除磁盘上的原视频.
+     *
+     * @return 实际新导入的 [MediaCache] 列表, 跳过的重复文件不在其中.
+     */
     suspend fun importFiles(
         subjectId: Int,
         subjectNameCN: String?,
@@ -72,40 +81,74 @@ class LocalImportMediaCacheStorage(
     ): List<MediaCache> = withContext(Dispatchers.IO_) {
         // Android 上导入的是 SAF content:// URI, 临时授权在应用重启后失效, 需要尽早持久化.
         importEngine.fileAccess.persistReadPermissions(items.map { it.filePath })
-        items.map { item ->
-            val mediaId = "local-import-$subjectId-${item.episodeId}-${currentTimeMillis()}-${item.filename.hashCode()}"
-            val media = DefaultMedia(
-                mediaId = mediaId,
-                mediaSourceId = mediaSourceId,
-                originalUrl = item.filePath,
-                download = ResourceLocation.LocalFile(item.filePath),
-                originalTitle = item.filename,
-                publishedTime = currentTimeMillis(),
-                properties = EmptyMediaProperties.copy(
-                    subjectName = subjectNameCN,
-                    episodeName = item.episodeTitle,
-                ),
-                episodeRange = EpisodeRange.single(item.episodeSort),
-                location = MediaSourceLocation.Local,
-                kind = MediaSourceKind.LocalCache,
-            )
-            val metadata = MediaCacheMetadata(
-                subjectId = subjectId.toString(),
-                episodeId = item.episodeId.toString(),
-                subjectNameCN = subjectNameCN,
-                subjectNames = subjectNames,
-                episodeSort = item.episodeSort,
-                episodeEp = item.episodeSort,
-                episodeName = item.episodeTitle,
-                creationTime = currentTimeMillis(),
-                autoCached = false,
-            )
-            val episodeMetadata = EpisodeMetadata(
-                title = item.episodeTitle,
-                ep = item.episodeSort,
-                sort = item.episodeSort,
-            )
-            cache(media, metadata, episodeMetadata, resume = false)
+
+        val existingByEpisode = HashMap(
+            listFlow.first()
+                .filter { it.metadata.subjectId == subjectId.toString() }
+                .groupBy { it.metadata.episodeId },
+        )
+
+        val imported = ArrayList<MediaCache>(items.size)
+        for (item in items) {
+            val episodeKey = item.episodeId.toString()
+            val existingForEpisode = existingByEpisode[episodeKey].orEmpty()
+            val filePathOf = { cache: MediaCache ->
+                (cache.origin.download as? ResourceLocation.LocalFile)?.filePath
+            }
+            val identical = existingForEpisode.firstOrNull { filePathOf(it) == item.filePath }
+            if (identical != null) {
+                existingForEpisode
+                    .filter { it !== identical && filePathOf(it) == item.filePath }
+                    .forEach { delete(it) }
+                existingByEpisode[episodeKey] = listOf(identical)
+                continue
+            }
+            existingForEpisode.forEach { delete(it) }
+            val newCache = importOne(subjectId, subjectNameCN, subjectNames, item)
+            existingByEpisode[episodeKey] = listOf(newCache)
+            imported.add(newCache)
         }
+        imported
+    }
+
+    private suspend fun importOne(
+        subjectId: Int,
+        subjectNameCN: String?,
+        subjectNames: List<String>,
+        item: LocalImportFileItem,
+    ): MediaCache {
+        val mediaId = "local-import-$subjectId-${item.episodeId}-${currentTimeMillis()}-${item.filename.hashCode()}"
+        val media = DefaultMedia(
+            mediaId = mediaId,
+            mediaSourceId = mediaSourceId,
+            originalUrl = item.filePath,
+            download = ResourceLocation.LocalFile(item.filePath),
+            originalTitle = item.filename,
+            publishedTime = currentTimeMillis(),
+            properties = EmptyMediaProperties.copy(
+                subjectName = subjectNameCN,
+                episodeName = item.episodeTitle,
+            ),
+            episodeRange = EpisodeRange.single(item.episodeSort),
+            location = MediaSourceLocation.Local,
+            kind = MediaSourceKind.LocalCache,
+        )
+        val metadata = MediaCacheMetadata(
+            subjectId = subjectId.toString(),
+            episodeId = item.episodeId.toString(),
+            subjectNameCN = subjectNameCN,
+            subjectNames = subjectNames,
+            episodeSort = item.episodeSort,
+            episodeEp = item.episodeSort,
+            episodeName = item.episodeTitle,
+            creationTime = currentTimeMillis(),
+            autoCached = false,
+        )
+        val episodeMetadata = EpisodeMetadata(
+            title = item.episodeTitle,
+            ep = item.episodeSort,
+            sort = item.episodeSort,
+        )
+        return cache(media, metadata, episodeMetadata, resume = false)
     }
 }

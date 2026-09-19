@@ -115,9 +115,11 @@ interface SubjectCacheViewModel {
     val allEpisodesFlow: Flow<List<EpisodeInfo>>
 
     /**
-     * 导入本地视频文件为已完成缓存.
+     * 导入本地视频文件为已完成缓存. 重复导入的文件会被跳过, 同一集导入新文件会替换旧缓存.
+     *
+     * @return 实际新导入的数量.
      */
-    suspend fun importLocalFiles(items: List<LocalImportFileItem>)
+    suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int
 }
 
 @Stable
@@ -330,8 +332,8 @@ class SubjectCacheViewModelImpl(
     override val allEpisodesFlow: Flow<List<EpisodeInfo>> =
         episodeCollectionsFlow.map { list -> list.map { it.episodeInfo } }
 
-    override suspend fun importLocalFiles(items: List<LocalImportFileItem>) {
-        if (items.isEmpty()) return
+    override suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int {
+        if (items.isEmpty()) return 0
         val subjectInfo = subjectInfoFlow.first().subjectInfo
         val caches = localImportStorage.importFiles(
             subjectId = subjectId,
@@ -363,6 +365,7 @@ class SubjectCacheViewModelImpl(
             } catch (_: Throwable) {
             }
         }
+        return caches.size
     }
 
     init {
