@@ -40,7 +40,7 @@ import me.him188.ani.utils.io.length
  *
  * @see MediaCacheEngine.restore
  */
-class LocalFileMediaCache(
+open class LocalFileMediaCache(
     override val origin: Media,
     override val metadata: MediaCacheMetadata,
     val file: SystemPath,
