@@ -12,6 +12,7 @@ package me.him188.ani.app.ui.cache
 import androidx.compose.runtime.Stable
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import io.ktor.client.call.body
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -174,13 +175,23 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
 
     private suspend fun searchAni(keywords: String): List<ImportSubjectCandidate> =
         subjectSearchService.searchSubjects(keywords, limit = 20)
-            .map { ImportSubjectCandidate(it.subjectId, it.displayName, it.imageLarge) }
+            .map {
+                ImportSubjectCandidate(
+                    subjectId = it.subjectInfo.subjectId,
+                    displayName = it.subjectInfo.displayName,
+                    imageUrl = it.subjectInfo.imageLarge,
+                )
+            }
+
+    private val bangumiSearchApi: DefaultApi by lazy {
+        DefaultApi(baseUrl = "https://api.bgm.tv")
+    }
 
     private suspend fun searchBangumi(keywords: String): List<ImportSubjectCandidate> =
         bangumiSearchApi.searchSubjects(
             limit = 20,
             bangumiSearchSubjectsRequest = BangumiSearchSubjectsRequest(keyword = keywords),
-        ).body().data.map {
+        ).body().data.orEmpty().map {
             ImportSubjectCandidate(
                 subjectId = it.id,
                 displayName = it.nameCn.ifBlank { it.name },
