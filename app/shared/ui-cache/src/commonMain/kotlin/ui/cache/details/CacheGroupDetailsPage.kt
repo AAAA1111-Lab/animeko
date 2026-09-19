@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -27,7 +25,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -138,9 +135,7 @@ fun MediaCacheDetailsScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .wrapContentWidth(align = Alignment.CenterHorizontally)
-                .padding(paddingValues)
-                .widthIn(max = 1200.dp),
+                .padding(paddingValues),
         ) {
             AniAnimatedVisibility(
                 visible = state.details != null,

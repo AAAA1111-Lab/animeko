@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -366,10 +364,7 @@ fun CacheManagementScreen(
                     top = paddingValues.calculateTopPadding(),
                     end = paddingValues.calculateEndPadding(layoutDirection),
                 )
-                // 设计稿: 超大屏时整体限宽.
-                .fillMaxWidth()
-                .wrapContentWidth()
-                .widthIn(max = 1200.dp),
+                .fillMaxWidth(),
             navigator = navigator,
             listPaneTopAppBar = null,
             listPaneContent = {
