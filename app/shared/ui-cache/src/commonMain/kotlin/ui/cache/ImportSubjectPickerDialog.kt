@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -101,9 +101,10 @@ internal fun ImportSubjectPickerDialog(
                 }
 
                 LazyColumn(
+                    // 固定高度: 切换类型筛选/加载中/空态时弹窗尺寸保持稳定, 不会跳动.
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .height(380.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (pagingItems.loadState.refresh is LoadState.Loading) {
