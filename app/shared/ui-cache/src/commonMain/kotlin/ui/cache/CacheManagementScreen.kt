@@ -587,8 +587,9 @@ fun CacheManagementScreen(
             contentWindowInsets = windowInsets.only(WindowInsetsSides.Horizontal),
             useSharedTransition = false,
             listPanePreferredWidth = preferredListPaneWidth(),
-            // 默认的 min 为 412.dp (≥1200dp 时), 会顶掉 400.dp 的 preferred 宽度.
-            minListPaneWidth = preferredListPaneWidth(),
+            // 最小值固定为 360dp: 若跟随 preferred (50% 窗口), 两栏最小值之和会超出可用宽度.
+            minListPaneWidth = 360.dp,
+            minDetailPaneWidth = 360.dp,
         )
 
         // 选择模式下导航返回应该退出选择模式.
@@ -598,23 +599,20 @@ fun CacheManagementScreen(
 }
 
 /**
- * 宽屏 (≥1200dp) 下左栏占窗口约 40%: 旧设计稿把左栏固定在 400dp, 大屏上列表过于局促而详情栏大面积留白.
- * 窄屏 (单栏) 仍按 M3 规范. 用户仍可通过中间的拖动手柄自行调整.
+ * 双栏布局下左栏默认占窗口一半 (400-760dp): 保证统计/筛选行单行容纳, 避免详情栏大面积留白.
+ * 旧设计稿把左栏固定在 360-412dp (按 840/1200dp 分档), 在 1000dp 左右的窗口上左栏过于局促.
+ * 拖动手柄仍可自行调整.
  */
 @Composable
 private fun preferredListPaneWidth(): Dp {
     val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
-    return when {
-        windowSizeClass.isWidthAtLeastBreakpoint(1200) -> {
-            val windowWidthDp = with(LocalDensity.current) {
-                LocalWindowInfo.current.containerSize.width.toDp()
-            }
-            (windowWidthDp * 0.4f).coerceIn(412.dp, 760.dp)
-        }
-
-        windowSizeClass.isWidthAtLeastBreakpoint(840) -> 360.dp // Expanded, M3 spec
-        else -> (((windowSizeClass.minWidthDp - 24 * 3).toFloat() / 2).dp).coerceAtLeast(360.dp) // M3 spec
+    if (!windowSizeClass.isWidthAtLeastBreakpoint(840)) {
+        return (((windowSizeClass.minWidthDp - 24 * 3).toFloat() / 2).dp).coerceAtLeast(360.dp) // M3 spec, 单栏
     }
+    val windowWidthDp = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.width.toDp()
+    }
+    return (windowWidthDp * 0.5f).coerceIn(400.dp, 760.dp)
 }
 
 /**
