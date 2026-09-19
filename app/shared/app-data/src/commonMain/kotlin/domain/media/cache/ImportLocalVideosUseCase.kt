@@ -9,13 +9,13 @@
 
 package me.him188.ani.app.domain.media.cache
 
+import kotlinx.coroutines.flow.first
 import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.domain.danmaku.DanmakuRepository
 import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.usecase.UseCase
 import me.him188.ani.danmaku.api.provider.DanmakuFetchRequest
-import me.him188.ani.datasources.api.topic.inBytes
 import kotlin.time.Duration
 
 /**
