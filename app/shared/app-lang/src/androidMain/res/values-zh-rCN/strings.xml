@@ -884,6 +884,14 @@
     <string name="cache_import_already_imported">所选视频均已导入</string>
     <string name="cache_import_select_subject">选择要导入到的条目</string>
     <string name="cache_import_subject_picker_empty">暂无可选的收藏条目</string>
+    <string name="cache_import_subject_picker_all">全部</string>
+    <string name="cache_import_mode_title">选择导入方式</string>
+    <string name="cache_import_mode_auto">自动剧集匹配</string>
+    <string name="cache_import_mode_auto_desc">从文件名识别作品并匹配剧集</string>
+    <string name="cache_import_mode_collection">从追番列表选择</string>
+    <string name="cache_import_mode_collection_desc">从收藏的条目中选择</string>
+    <string name="cache_import_auto_no_result">未找到匹配的条目</string>
+    <string name="cache_import_search_hint">关键词</string>
     <string name="cache_import_offset_title">批量偏移集数</string>
     <string name="cache_import_offset_apply">应用</string>
     <string name="cache_import_offset_hint">偏移量 (例如 12 或 -12)</string>

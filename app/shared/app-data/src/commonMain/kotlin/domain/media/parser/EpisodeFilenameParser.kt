@@ -27,6 +27,8 @@ object EpisodeFilenameParser {
     )
 
     private val VIDEO_EXT_REGEX = Regex("""\.(mp4|mkv|avi|flv|ts|mov|webm|wmv|m4v)$""", RegexOption.IGNORE_CASE)
+    private val BRACKETS_REGEX = Regex("""\[[^\]]*]|【[^】]*】|\([^)]*\)|（[^）]*）""")
+    private val WHITESPACE_REGEX = Regex("""\s+""")
 
     private val SXX_EXX_REGEX = Regex("""(?i)[sS](\d{1,2})[eE](\d{1,3}(?:\.\d+)?)""")
     private val SEASON_REGEX = Regex("""(?i)(?:season|\bS|part)\s*(\d{1,2})""")
@@ -134,6 +136,44 @@ object EpisodeFilenameParser {
         }
         if (str.length == 2 && str.startsWith("十")) {
             return 10 + (cnMap[str[1]] ?: 0)
+        }
+        return null
+    }
+
+    /**
+     * 从文件名中猜测作品标题, 用于自动剧集匹配 (刮削): 将猜测的标题用于搜索条目.
+     *
+     * 处理: 去扩展名 -> 去所有括号段 (字幕组/标签) -> 去分辨率/编码等噪声词与集数标记 -> 修剪分隔符.
+     * 若去除括号后为空 (例如 "[Group] Title"), 则取最后一个 ']' 或 '】' 之后的内容作为主体.
+     *
+     * @return 猜测的标题; 无法提取时为 null.
+     */
+    fun guessTitle(filename: String): String? {
+        val withoutExt = filename.replace(VIDEO_EXT_REGEX, "")
+
+        val candidates = buildList {
+            add(withoutExt.replace(BRACKETS_REGEX, " "))
+            val lastBracketEnd = withoutExt.indexOfLast { it == ']' || it == '】' }
+            if (lastBracketEnd in 0 until withoutExt.length - 1) {
+                add(withoutExt.substring(lastBracketEnd + 1))
+            }
+        }
+
+        for (candidate in candidates) {
+            val cleaned = candidate
+                .replace(NOISE_REGEX, " ")
+                .replace(SXX_EXX_REGEX, " ")
+                .replace(SEASON_REGEX, " ")
+                .replace(CHINESE_SEASON_REGEX, " ")
+                .replace(CHINESE_EP_REGEX, " ")
+                .replace(EP_PREFIX_REGEX, " ")
+                .replace(BRACKETED_EP_REGEX, " ")
+                .replace(DELIMITED_EP_REGEX, " ")
+                .replace(WHITESPACE_REGEX, " ")
+                .trim(' ', '-', '_', '.', '~')
+            if (cleaned.length >= 2) {
+                return cleaned
+            }
         }
         return null
     }

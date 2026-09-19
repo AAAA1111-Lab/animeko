@@ -108,4 +108,35 @@ class EpisodeFilenameParserTest {
         assertEquals(8.5f, res.episodeNumber)
         assertTrue(res.isConfident)
     }
+
+    @Test
+    fun testGuessTitleWithFansubGroupAndTags() {
+        val title = EpisodeFilenameParser.guessTitle(
+            "[LPSub] Ruri no Houseki S01E01 (BDRip 1080p HEVC-YUV420P10 FLAC).mkv",
+        )
+        assertEquals("Ruri no Houseki", title)
+    }
+
+    @Test
+    fun testGuessTitleDelimitedEpisode() {
+        val title = EpisodeFilenameParser.guessTitle("Sousou no Frieren - 01 [WebRip 1080p].mkv")
+        assertEquals("Sousou no Frieren", title)
+    }
+
+    @Test
+    fun testGuessTitleChineseEpisode() {
+        val title = EpisodeFilenameParser.guessTitle("葬送的芙莉莲 第01话 1080p.mkv")
+        assertEquals("葬送的芙莉莲", title)
+    }
+
+    @Test
+    fun testGuessTitleTextAfterBrackets() {
+        val title = EpisodeFilenameParser.guessTitle("[Group] Girls Band Cry - 12v2 (BD 1920x1080).mkv")
+        assertEquals("Girls Band Cry", title)
+    }
+
+    @Test
+    fun testGuessTitleReturnsNullWhenNothingLeft() {
+        assertEquals(null, EpisodeFilenameParser.guessTitle("[Group][Only][Brackets].mkv"))
+    }
 }

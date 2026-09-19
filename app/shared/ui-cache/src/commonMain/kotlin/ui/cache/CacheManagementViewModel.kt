@@ -26,6 +26,7 @@ import kotlinx.coroutines.supervisorScope
 import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.data.models.subject.SubjectInfo
+import me.him188.ani.app.data.network.AniSubjectSearchService
 import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
 import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
@@ -57,6 +58,7 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
     private val subjectRepository: SubjectCollectionRepository by inject()
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
     private val importLocalVideosUseCase: ImportLocalVideosUseCase by inject()
+    private val subjectSearchService: AniSubjectSearchService by inject()
 
     private val playbackHistoriesByEpisodeId = episodePlayHistoryRepository.flow
         .map { histories -> histories.associateBy { it.episodeId } }
@@ -150,11 +152,18 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
     }
 
     /**
-     * 本地导入: 供选择条目的收藏列表.
+     * 本地导入: 供选择条目的收藏列表, 支持按收藏类型过滤.
      */
-    val importSubjectsPager: Flow<PagingData<SubjectCollectionInfo>> =
-        subjectRepository.subjectCollectionsPager(CollectionsFilterQuery.Empty)
+    fun importSubjectsPager(query: CollectionsFilterQuery): Flow<PagingData<SubjectCollectionInfo>> =
+        subjectRepository.subjectCollectionsPager(query)
             .cachedIn(backgroundScope)
+
+    /**
+     * 本地导入 (自动匹配): 按关键词搜索条目, 返回候选列表.
+     */
+    suspend fun searchSubjectsForImport(keywords: String): List<SubjectInfo> {
+        return subjectSearchService.searchSubjects(keywords, limit = 20).map { it.subjectInfo }
+    }
 
     /**
      * 本地导入: 加载条目的全部剧集, 用于文件与剧集的匹配.

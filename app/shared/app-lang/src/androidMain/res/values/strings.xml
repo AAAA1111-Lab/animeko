@@ -844,6 +844,14 @@
     <string name="cache_import_already_imported">Selected videos are already imported</string>
     <string name="cache_import_select_subject">Select a subject to import into</string>
     <string name="cache_import_subject_picker_empty">No collected subjects found</string>
+    <string name="cache_import_subject_picker_all">All</string>
+    <string name="cache_import_mode_title">Choose import mode</string>
+    <string name="cache_import_mode_auto">Auto episode matching</string>
+    <string name="cache_import_mode_auto_desc">Identify the anime from filenames</string>
+    <string name="cache_import_mode_collection">Pick from collection list</string>
+    <string name="cache_import_mode_collection_desc">Pick a subject from your collections</string>
+    <string name="cache_import_auto_no_result">No matching subject found</string>
+    <string name="cache_import_search_hint">Keywords</string>
     <string name="cache_import_offset_title">Shift Episode Number</string>
     <string name="cache_import_offset_apply">Apply</string>
     <string name="cache_import_offset_hint">Offset (e.g. 12 or -12)</string>

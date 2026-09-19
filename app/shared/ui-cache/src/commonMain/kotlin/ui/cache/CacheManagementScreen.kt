@@ -81,12 +81,14 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.name
 import kotlinx.coroutines.launch
 import me.him188.ani.app.data.models.episode.EpisodeInfo
 import me.him188.ani.app.data.models.episode.displayName
-import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
+import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.domain.media.cache.engine.MediaStats
 import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
+import me.him188.ani.app.domain.media.parser.EpisodeFilenameParser
 import me.him188.ani.app.ui.adaptive.AniListDetailPaneScaffold
 import me.him188.ani.app.ui.adaptive.AniTopAppBar
 import me.him188.ani.app.ui.adaptive.AniTopAppBarDefaults
@@ -192,10 +194,12 @@ fun CacheManagementScreen(
 ) {
     val state by vm.stateFlow.collectAsStateWithLifecycle()
 
-    // region 本地导入: 选文件 -> 选条目 -> 剧集匹配 -> 导入
+    // region 本地导入: 选文件 -> 选择模式 (自动匹配 / 从追番列表选择) -> 剧集匹配 -> 导入
     var importCandidateFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
-    var showImportSubjectPicker by remember { mutableStateOf(false) }
-    var importSubject by remember { mutableStateOf<SubjectCollectionInfo?>(null) }
+    var showImportModeChooser by remember { mutableStateOf(false) }
+    var showImportCollectionPicker by remember { mutableStateOf(false) }
+    var showImportSearchPicker by remember { mutableStateOf(false) }
+    var importSubjectInfo by remember { mutableStateOf<SubjectInfo?>(null) }
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val importSuccessTemplate = stringResource(Lang.cache_import_success)
@@ -209,29 +213,70 @@ fun CacheManagementScreen(
     ) { files ->
         if (!files.isNullOrEmpty()) {
             importCandidateFiles = files
-            showImportSubjectPicker = true
+            showImportModeChooser = true
         }
     }
 
-    if (showImportSubjectPicker) {
-        ImportSubjectPickerDialog(
-            pager = vm.importSubjectsPager,
-            onDismiss = { showImportSubjectPicker = false },
-            onSelect = {
-                showImportSubjectPicker = false
-                importSubject = it
+    fun dismissImportDialogs() {
+        showImportModeChooser = false
+        showImportCollectionPicker = false
+        showImportSearchPicker = false
+        importCandidateFiles = emptyList()
+    }
+
+    if (showImportModeChooser) {
+        ImportModeChooserDialog(
+            fileCount = importCandidateFiles.size,
+            onDismiss = { dismissImportDialogs() },
+            onAutoMatch = {
+                showImportModeChooser = false
+                showImportSearchPicker = true
+            },
+            onFromCollection = {
+                showImportModeChooser = false
+                showImportCollectionPicker = true
             },
         )
     }
 
-    importSubject?.let { subject ->
+    if (showImportCollectionPicker) {
+        ImportSubjectPickerDialog(
+            pagerFactory = { query -> vm.importSubjectsPager(query) },
+            onDismiss = { dismissImportDialogs() },
+            onSelect = {
+                showImportCollectionPicker = false
+                importSubjectInfo = it.subjectInfo
+            },
+        )
+    }
+
+    if (showImportSearchPicker) {
+        val autoKeywords = remember(importCandidateFiles) {
+            importCandidateFiles.firstOrNull()?.name?.let { EpisodeFilenameParser.guessTitle(it) }
+        }
+        ImportSubjectSearchDialog(
+            initialKeywords = autoKeywords,
+            onSearch = { vm.searchSubjectsForImport(it) },
+            onDismiss = { dismissImportDialogs() },
+            onSelect = {
+                showImportSearchPicker = false
+                importSubjectInfo = it
+            },
+            onManualFallback = {
+                showImportSearchPicker = false
+                showImportCollectionPicker = true
+            },
+        )
+    }
+
+    importSubjectInfo?.let { subject ->
         val importEpisodes by produceState<List<EpisodeInfo>?>(null, subject.subjectId) {
             value = runCatching { vm.loadEpisodesForImport(subject.subjectId) }.getOrNull()
         }
         when (val episodes = importEpisodes) {
             null -> AlertDialog(
-                onDismissRequest = { importSubject = null },
-                title = { Text(subject.subjectInfo.displayName) },
+                onDismissRequest = { importSubjectInfo = null },
+                title = { Text(subject.displayName) },
                 text = {
                     Box(
                         Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -246,13 +291,13 @@ fun CacheManagementScreen(
             else -> LocalMediaImportDialog(
                 files = importCandidateFiles,
                 episodes = episodes,
-                subjectTitle = subject.subjectInfo.displayName,
+                subjectTitle = subject.displayName,
                 onDismissRequest = {
-                    importSubject = null
+                    importSubjectInfo = null
                     importCandidateFiles = emptyList()
                 },
                 onConfirm = { candidates ->
-                    importSubject = null
+                    importSubjectInfo = null
                     val items = candidates.mapNotNull { candidate ->
                         val ep = candidate.targetEpisode ?: return@mapNotNull null
                         LocalImportFileItem(
@@ -265,7 +310,7 @@ fun CacheManagementScreen(
                     }
                     if (items.isEmpty()) return@LocalMediaImportDialog
                     scope.launch {
-                        val importedCount = vm.importLocalFiles(subject.subjectInfo, items)
+                        val importedCount = vm.importLocalFiles(subject, items)
                         toaster.show(
                             if (importedCount > 0) {
                                 importSuccessTemplate
