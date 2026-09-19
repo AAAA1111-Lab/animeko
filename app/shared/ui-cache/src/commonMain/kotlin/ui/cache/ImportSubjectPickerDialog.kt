@@ -9,18 +9,20 @@
 
 package me.him188.ani.app.ui.cache
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -34,7 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.PagingData
@@ -42,6 +47,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.flow.Flow
 import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
+import me.him188.ani.app.ui.foundation.AsyncImage
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_filter_collection_doing
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
@@ -52,7 +58,6 @@ import me.him188.ani.app.ui.lang.cache_import_cancel
 import me.him188.ani.app.ui.lang.cache_import_select_subject
 import me.him188.ani.app.ui.lang.cache_import_subject_picker_all
 import me.him188.ani.app.ui.lang.cache_import_subject_picker_empty
-import me.him188.ani.app.ui.subject.SubjectCoverCard
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
 import org.jetbrains.compose.resources.stringResource
 
@@ -65,7 +70,7 @@ import org.jetbrains.compose.resources.stringResource
 internal fun ImportSubjectPickerDialog(
     pagerFactory: (CollectionsFilterQuery) -> Flow<PagingData<SubjectCollectionInfo>>,
     onDismiss: () -> Unit,
-    onSelect: (SubjectCollectionInfo) -> Unit,
+    onSelect: (ImportSubjectCandidate) -> Unit,
 ) {
     var selectedType by remember { mutableStateOf<UnifiedCollectionType?>(null) }
     val pagingItems = remember(selectedType) {
@@ -97,16 +102,15 @@ internal fun ImportSubjectPickerDialog(
                     }
                 }
 
-                LazyVerticalGrid(
-                    GridCells.Adaptive(120.dp),
+                LazyColumn(
+                    // 固定高度: 切换类型筛选/加载中/空态时弹窗尺寸保持稳定, 不会跳动.
                     Modifier
                         .fillMaxWidth()
                         .height(380.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (pagingItems.loadState.refresh is LoadState.Loading) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
+                        item(key = "loading") {
                             Box(
                                 Modifier
                                     .fillMaxWidth()
@@ -117,7 +121,7 @@ internal fun ImportSubjectPickerDialog(
                             }
                         }
                     } else if (pagingItems.itemCount == 0) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
+                        item(key = "empty") {
                             Text(
                                 stringResource(Lang.cache_import_subject_picker_empty),
                                 Modifier
@@ -133,11 +137,10 @@ internal fun ImportSubjectPickerDialog(
                         key = { pagingItems.peek(it)?.subjectId ?: it },
                     ) { index ->
                         val subject = pagingItems[index] ?: return@items
-                        SubjectCoverCard(
-                            name = subject.subjectInfo.displayName,
-                            image = subject.subjectInfo.imageLarge,
-                            isPlaceholder = false,
-                            onClick = { onSelect(subject) },
+                        ImportSubjectCardRow(
+                            displayName = subject.subjectInfo.displayName,
+                            imageUrl = subject.subjectInfo.imageLarge,
+                            onClick = { onSelect(ImportSubjectCandidate(subject.subjectId, subject.subjectInfo.displayName, subject.subjectInfo.imageLarge)) },
                         )
                     }
                 }
@@ -147,6 +150,40 @@ internal fun ImportSubjectPickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(Lang.cache_import_cancel)) }
         },
     )
+}
+
+/**
+ * 条目候选行: 封面缩略图 + 名称.
+ */
+@Composable
+internal fun ImportSubjectCardRow(
+    displayName: String,
+    imageUrl: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(width = 42.dp, height = 56.dp)
+                .clip(RoundedCornerShape(6.dp)),
+        )
+        Spacer(Modifier.size(12.dp))
+        Text(
+            displayName,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
