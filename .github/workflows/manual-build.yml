@@ -13,7 +13,7 @@ on:
           - 'windows'
           - 'all'
       release_tag:
-        description: '发布版本号 (留空自动使用代码中的版本号)'
+        description: '发布版本号 (留空=使用仓库版本; 填写=构建产物与发布均使用此版本, 支持 v 前缀)'
         required: false
         default: ''
         type: string
@@ -50,6 +50,16 @@ jobs:
           signing_release_keyAlias=animeko
           signing_release_keyPassword=animeko123
           EOF
+
+      - name: Override version from release input
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          sed -i -E "s|^version\.name=.*|version.name=${VERSION}|" gradle.properties
+          sed -i -E "s|^package\.version=.*|package.version=${VERSION%-*}|" gradle.properties
+          echo "构建版本号已覆写为: ${VERSION}"
 
       - name: Cache JBR 21
         uses: actions/cache@v4
@@ -105,6 +115,17 @@ jobs:
         run: |
           echo "ani.enable.firebase=false" >> local.properties
           echo "jvm.toolchain.version=21" >> local.properties
+
+      - name: Override version from release input
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          sed -i -E "s|^version\.name=.*|version.name=${VERSION}|" gradle.properties
+          sed -i -E "s|^package\.version=.*|package.version=${VERSION%-*}|" gradle.properties
+          echo "构建版本号已覆写为: ${VERSION}"
 
       - name: Cache JBR 21
         uses: actions/cache@v4
@@ -162,13 +183,16 @@ jobs:
 
       - name: Determine Release Metadata
         id: meta
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
           if [ -z "$CODE_VERSION" ]; then
-            CODE_VERSION="6.2.0.1-alpha01"
+            echo "gradle.properties 中未找到 version.name, 无法确定发布版本" >&2
+            exit 1
           fi
 
-          TAG="${{ inputs.release_tag }}"
+          TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
             TAG="v${CODE_VERSION}"
           fi
