@@ -32,7 +32,7 @@ class LocalImportMediaCacheEngine(
     val fileAccess: LocalImportFileAccess = SystemLocalImportFileAccess(),
 ) : MediaCacheEngine {
     companion object {
-        val ENGINE_KEY = MediaCacheEngineKey("local-file-import")
+        val ENGINE_KEY = MediaCacheEngineKey.LocalFileImport
     }
 
     override val stats: Flow<MediaStats> = MutableStateFlow(MediaStats.Zero)
@@ -94,12 +94,12 @@ private class LocalImportMediaCache(
     origin = origin,
     metadata = metadata,
     file = file,
-    backedMediaSourceId = MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID,
+    backedMediaSourceId = MediaCacheManager.LOCAL_IMPORT_MEDIA_SOURCE_ID,
     onCloseAndDeleteFiles = {
         // Safety: Do NOT delete user's original imported media files on disk!
     },
 ) {
     override suspend fun getCachedMedia(): CachedMedia {
-        return CachedMedia(origin, MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID, origin.download)
+        return CachedMedia(origin, MediaCacheManager.LOCAL_IMPORT_MEDIA_SOURCE_ID, origin.download)
     }
 }

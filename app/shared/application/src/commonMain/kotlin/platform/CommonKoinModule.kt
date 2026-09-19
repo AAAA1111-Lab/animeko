@@ -482,15 +482,14 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
     }
 
     single<LocalImportMediaCacheStorage> {
-        val id = MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID
         val metadataStore = getContext().dataStores.mediaCacheMetadataStore
         LocalImportMediaCacheStorage(
-            mediaSourceId = id,
+            mediaSourceId = MediaCacheManager.LOCAL_IMPORT_MEDIA_SOURCE_ID,
             datastore = metadataStore,
             importEngine = LocalImportMediaCacheEngine(
                 fileAccess = createLocalImportFileAccess(getContext()),
             ),
-            displayName = "LocalImport",
+            displayName = "本地导入",
             parentCoroutineContext = coroutineScope.childScopeContext(),
         )
     }

@@ -242,6 +242,7 @@ fun SubjectCachePage(
     if (showDeleteSelectedDialog) {
         DeleteActionDialog(
             onDismiss = { showDeleteSelectedDialog = false },
+            containsLocalImport = selectedEntries.any { it.isLocalImport },
             onConfirm = {
                 selectedEntries.forEach(onDelete)
                 selectionState.clear()

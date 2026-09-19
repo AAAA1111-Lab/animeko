@@ -99,6 +99,7 @@ fun CacheEpisodeRow(
     if (showConfirmDelete) {
         DeleteActionDialog(
             onDismiss = { showConfirmDelete = false },
+            containsLocalImport = episode.isLocalImport,
             onConfirm = {
                 onDelete()
                 showConfirmDelete = false

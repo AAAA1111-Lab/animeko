@@ -287,6 +287,7 @@ fun CacheManagementScreen(
     if (deleteSelectedCacheDialog) {
         DeleteActionDialog(
             onDismiss = { deleteSelectedCacheDialog = false },
+            containsLocalImport = selectedEntries.any { it.isLocalImport },
             onConfirm = {
                 selectionEntries.filter { it.cacheId in selectionState.selectedIds }
                     .forEach { onDelete(it) }
@@ -748,12 +749,24 @@ object CacheManagementTestTags {
 internal fun DeleteActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    containsLocalImport: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
         title = { Text(stringResource(Lang.cache_management_delete_cache_title)) },
-        text = { Text(stringResource(Lang.cache_management_delete_cache_confirmation)) },
+        text = {
+            Column {
+                Text(stringResource(Lang.cache_management_delete_cache_confirmation))
+                if (containsLocalImport) {
+                    Text(
+                        stringResource(Lang.cache_management_delete_local_import_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,

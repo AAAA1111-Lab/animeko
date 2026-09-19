@@ -11,6 +11,7 @@ package me.him188.ani.app.domain.media.cache.storage
 
 import androidx.datastore.core.DataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import me.him188.ani.app.domain.media.cache.MediaCache
 import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine

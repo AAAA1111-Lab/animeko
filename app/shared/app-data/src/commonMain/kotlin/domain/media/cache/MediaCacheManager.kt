@@ -152,6 +152,12 @@ abstract class MediaCacheManager(
          * 本地数据源不允许有多个示例. 必须是 Factory:MediaSource:Instance = 1:1:1 的关系.
          */
         const val LOCAL_FS_MEDIA_SOURCE_ID = "local-file-system"
+
+        /**
+         * 本地导入 (软引用外部视频文件) 的存储与数据源 id.
+         * 独立于 [LOCAL_FS_MEDIA_SOURCE_ID], 以便 UI 展示 "本地导入" 而非 "LocalTorrent".
+         */
+        const val LOCAL_IMPORT_MEDIA_SOURCE_ID = "local-import"
     }
 }
 

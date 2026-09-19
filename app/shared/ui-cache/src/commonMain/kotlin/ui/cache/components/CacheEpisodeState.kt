@@ -81,6 +81,11 @@ class CacheEpisodeState(
     val isFailed get() = state == CacheEpisodePaused.FAILED
     val isFinished get() = state == CacheEpisodePaused.COMPLETED
 
+    /**
+     * 该缓存是否为导入的本地视频 (软引用磁盘原文件). 删除此类缓存不会删除磁盘上的原视频.
+     */
+    val isLocalImport get() = engineKey == MediaCacheEngineKey.LocalFileImport
+
     val totalSize: FileSize get() = stats.totalSize
 
     val sizeText: String? = run {

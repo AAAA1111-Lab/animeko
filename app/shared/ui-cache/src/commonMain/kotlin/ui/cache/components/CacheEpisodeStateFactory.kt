@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import me.him188.ani.app.data.models.player.EpisodeHistory
 import me.him188.ani.app.domain.media.cache.MediaCache
+import me.him188.ani.app.domain.media.cache.MediaCacheManager
 import me.him188.ani.app.domain.media.cache.MediaCacheState
 import me.him188.ani.app.domain.media.cache.engine.MediaCacheEngineKey
 import me.him188.ani.app.domain.media.cache.storage.MediaCacheStorage
@@ -112,7 +113,13 @@ internal fun HasBackgroundScope.createCacheEpisodeStateFlow(
                 !canPlay -> CacheEpisodeState.Playability.STREAMING_NOT_SUPPORTED
                 else -> CacheEpisodeState.Playability.PLAYABLE
             },
-            mediaSourceId = mediaCache.cache.origin.mediaSourceId,
+            mediaSourceId = if (mediaCache.engineKey == MediaCacheEngineKey.LocalFileImport) {
+                // 旧版本导入的缓存 origin 挂在 "local-file-system" 下, 标签会被解析成 "LocalTorrent";
+                // 重映射到本地导入数据源, 保证新旧缓存都显示 "本地导入".
+                MediaCacheManager.LOCAL_IMPORT_MEDIA_SOURCE_ID
+            } else {
+                mediaCache.cache.origin.mediaSourceId
+            },
         )
     }
 }
