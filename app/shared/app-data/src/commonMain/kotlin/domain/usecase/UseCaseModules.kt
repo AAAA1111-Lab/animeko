@@ -41,6 +41,8 @@ import me.him188.ani.app.domain.media.cache.DeleteCacheUseCase
 import me.him188.ani.app.domain.media.cache.DeleteCacheUseCaseImpl
 import me.him188.ani.app.domain.media.cache.GetMediaCacheUseCase
 import me.him188.ani.app.domain.media.cache.GetMediaCacheUseCaseImpl
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCaseImpl
 import me.him188.ani.app.domain.media.selector.GetPreferredMediaSourceSortingUseCase
 import me.him188.ani.app.domain.media.selector.GetPreferredMediaSourceSortingUseCaseImpl
 import me.him188.ani.app.domain.media.selector.MediaSelectorAutoSelectUseCase
@@ -91,6 +93,7 @@ fun KoinApplication.useCaseModules() = module {
     single<GetMediaSourceInstancesUseCase> { GetMediaSourceInstancesUseCaseImpl(get()) }
     single<GetSubjectRecommendationUseCase> { GetSubjectRecommendationUseCaseImpl(get()) }
     single<GetMediaCacheUseCase> { GetMediaCacheUseCaseImpl(get()) }
+    single<ImportLocalVideosUseCase> { ImportLocalVideosUseCaseImpl(get(), get()) }
     single<DeleteCacheUseCase> { DeleteCacheUseCaseImpl(get(), get()) }
     single<DeleteCacheByCacheIdUseCase> { DeleteCacheByCacheIdUseCaseImpl(get(), get()) }
     single<DeleteCacheByEpisodeIdUseCase> { DeleteCacheByEpisodeIdUseCaseImpl(get(), get()) }

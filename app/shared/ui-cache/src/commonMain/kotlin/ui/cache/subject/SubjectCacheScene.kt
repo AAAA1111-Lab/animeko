@@ -50,8 +50,8 @@ import me.him188.ani.app.domain.media.cache.requester.CacheRequestStage
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequest
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequester
 import me.him188.ani.app.domain.media.cache.requester.EpisodeCacheRequesterImpl
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
 import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
-import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
 import me.him188.ani.app.domain.media.resolver.toEpisodeMetadata
 import me.him188.ani.app.domain.media.selector.MediaSelectorFactory
@@ -137,7 +137,7 @@ class SubjectCacheViewModelImpl(
     private val deleteCacheByEpisodeIdUseCase: DeleteCacheByEpisodeIdUseCase by inject()
     private val deleteCacheByCacheIdUseCase: DeleteCacheByCacheIdUseCase by inject()
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
-    private val localImportStorage: LocalImportMediaCacheStorage by inject()
+    private val importLocalVideosUseCase: ImportLocalVideosUseCase by inject()
 
     private val playbackHistoriesByEpisodeId = episodePlayHistoryRepository.flow
         .map { histories -> histories.associateBy { it.episodeId } }
@@ -335,37 +335,7 @@ class SubjectCacheViewModelImpl(
     override suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int {
         if (items.isEmpty()) return 0
         val subjectInfo = subjectInfoFlow.first().subjectInfo
-        val caches = localImportStorage.importFiles(
-            subjectId = subjectId,
-            subjectNameCN = subjectInfo.nameCn.ifBlank { subjectInfo.name },
-            subjectNames = listOfNotNull(subjectInfo.nameCn, subjectInfo.name).distinct(),
-            items = items,
-        )
-        val episodeMap = episodeCollectionsFlow.first().associateBy { it.episodeId }
-        caches.forEach { cache ->
-            try {
-                val epId = cache.metadata.episodeId.toIntOrNull() ?: return@forEach
-                val epInfo = episodeMap[epId]?.episodeInfo
-                danmakuRepository.cacheDanmakuIfNeeded(
-                    DanmakuFetchRequest(
-                        subjectId = subjectInfo.subjectId,
-                        subjectPrimaryName = subjectInfo.displayName,
-                        subjectNames = subjectInfo.allNames,
-                        subjectPublishDate = subjectInfo.airDate,
-                        episodeId = epId,
-                        episodeSort = cache.metadata.episodeSort,
-                        episodeEp = cache.metadata.episodeEp,
-                        episodeName = epInfo?.displayName ?: cache.metadata.episodeName,
-                        filename = cache.origin.originalTitle,
-                        fileSize = cache.fileStats.first().totalSize.inBytes,
-                        fileHash = null,
-                        videoDuration = Duration.ZERO,
-                    ),
-                )
-            } catch (_: Throwable) {
-            }
-        }
-        return caches.size
+        return importLocalVideosUseCase.import(subjectInfo, items)
     }
 
     init {

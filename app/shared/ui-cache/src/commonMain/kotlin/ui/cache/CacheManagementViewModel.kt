@@ -10,9 +10,12 @@
 package me.him188.ani.app.ui.cache
 
 import androidx.compose.runtime.Stable
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -20,13 +23,19 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import me.him188.ani.app.data.models.episode.EpisodeInfo
+import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
+import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
+import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
 import me.him188.ani.app.data.repository.subject.staticSubjectImageLargeUrl
 import me.him188.ani.app.domain.media.cache.DeleteCacheByCacheIdUseCase
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
 import me.him188.ani.app.domain.media.cache.MediaCacheManager
 import me.him188.ani.app.domain.media.cache.engine.MediaStats
 import me.him188.ani.app.domain.media.cache.engine.sum
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.domain.media.cache.storage.MediaCacheStorage
 import me.him188.ani.app.ui.cache.components.CacheEpisodeState
 import me.him188.ani.app.ui.cache.components.CacheGroupState
@@ -47,6 +56,7 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
     private val deleteCacheByCacheIdUseCase: DeleteCacheByCacheIdUseCase by inject()
     private val subjectRepository: SubjectCollectionRepository by inject()
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
+    private val importLocalVideosUseCase: ImportLocalVideosUseCase by inject()
 
     private val playbackHistoriesByEpisodeId = episodePlayHistoryRepository.flow
         .map { histories -> histories.associateBy { it.episodeId } }
@@ -137,6 +147,30 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
         backgroundScope.launch {
             deleteCacheByCacheIdUseCase(cache.subjectId, cache.episodeId, cache.cacheId)
         }
+    }
+
+    /**
+     * 本地导入: 供选择条目的收藏列表.
+     */
+    val importSubjectsPager: Flow<PagingData<SubjectCollectionInfo>> =
+        subjectRepository.subjectCollectionsPager(CollectionsFilterQuery.Empty)
+            .cachedIn(backgroundScope)
+
+    /**
+     * 本地导入: 加载条目的全部剧集, 用于文件与剧集的匹配.
+     */
+    suspend fun loadEpisodesForImport(subjectId: Int): List<EpisodeInfo> {
+        return subjectRepository.subjectCollectionFlow(subjectId).first().episodes.map { it.episodeInfo }
+    }
+
+    /**
+     * 本地导入: 将文件导入为指定条目的已完成缓存.
+     *
+     * @return 实际新导入的数量, 重复导入的文件会被跳过.
+     */
+    suspend fun importLocalFiles(subjectInfo: SubjectInfo, items: List<LocalImportFileItem>): Int {
+        if (items.isEmpty()) return 0
+        return importLocalVideosUseCase.import(subjectInfo, items)
     }
 }
 

@@ -842,6 +842,8 @@
     <string name="cache_import_empty_hint">No video files selected</string>
     <string name="cache_import_success">Imported %1$d local videos</string>
     <string name="cache_import_already_imported">Selected videos are already imported</string>
+    <string name="cache_import_select_subject">Select a subject to import into</string>
+    <string name="cache_import_subject_picker_empty">No collected subjects found</string>
     <string name="cache_import_offset_title">Shift Episode Number</string>
     <string name="cache_import_offset_apply">Apply</string>
     <string name="cache_import_offset_hint">Offset (e.g. 12 or -12)</string>

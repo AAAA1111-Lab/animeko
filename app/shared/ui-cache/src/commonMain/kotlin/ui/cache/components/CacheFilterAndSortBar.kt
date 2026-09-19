@@ -9,12 +9,12 @@
 
 package me.him188.ani.app.ui.cache.components
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
@@ -192,6 +192,7 @@ internal fun CacheFilterAndSortBar(
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CacheFilterRow(
     selectedCollectionType: UnifiedCollectionType?,
@@ -203,11 +204,12 @@ private fun CacheFilterRow(
     onStatusChange: (CacheStatusFilter?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // 换行而不是横向滚动: 避免窄窗口下最后一个筛选 chip 被视口截断, 看起来像缺失.
+    FlowRow(
         modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+            .fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CollectionFilterChip(selectedCollectionType, onCollectionTypeChange)
         EngineFilterChip(selectedEngine, engineOptions, onEngineChange)

@@ -31,11 +31,13 @@ import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -57,7 +59,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,7 +75,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import kotlinx.coroutines.launch
+import me.him188.ani.app.data.models.episode.EpisodeInfo
+import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.domain.media.cache.engine.MediaStats
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.ui.adaptive.AniListDetailPaneScaffold
 import me.him188.ani.app.ui.adaptive.AniTopAppBar
 import me.him188.ani.app.ui.adaptive.AniTopAppBarDefaults
@@ -88,6 +100,7 @@ import me.him188.ani.app.ui.cache.components.TestCacheGroupSates
 import me.him188.ani.app.ui.cache.components.createTestMediaStats
 import me.him188.ani.app.ui.cache.components.rememberCacheFilterAndSortState
 import me.him188.ani.app.ui.cache.components.rememberCacheSelectionState
+import me.him188.ani.app.ui.cache.subject.LocalMediaImportDialog
 import me.him188.ani.app.ui.cache.subject.SubjectCacheDetailHeader
 import me.him188.ani.app.ui.cache.subject.SubjectCacheDetailPaneContent
 import me.him188.ani.app.ui.cache.subject.SubjectCacheSummaryRow
@@ -109,6 +122,9 @@ import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_episode_pause_download
 import me.him188.ani.app.ui.lang.cache_episode_resume_download
+import me.him188.ani.app.ui.lang.cache_import_already_imported
+import me.him188.ani.app.ui.lang.cache_import_local_media
+import me.him188.ani.app.ui.lang.cache_import_success
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_confirmation
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_title
 import me.him188.ani.app.ui.lang.cache_management_delete_local_import_confirmation
@@ -172,6 +188,97 @@ fun CacheManagementScreen(
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
 ) {
     val state by vm.stateFlow.collectAsStateWithLifecycle()
+
+    // region 本地导入: 选文件 -> 选条目 -> 剧集匹配 -> 导入
+    var importCandidateFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
+    var showImportSubjectPicker by remember { mutableStateOf(false) }
+    var importSubject by remember { mutableStateOf<SubjectCollectionInfo?>(null) }
+    val toaster = LocalToaster.current
+    val scope = rememberCoroutineScope()
+    val importSuccessTemplate = stringResource(Lang.cache_import_success)
+    val alreadyImportedText = stringResource(Lang.cache_import_already_imported)
+    val importVideoExtensions = remember {
+        listOf("mp4", "mkv", "avi", "flv", "ts", "webm", "mov", "m4v", "wmv", "rmvb")
+    }
+    val importFilePickerLauncher = rememberFilePickerLauncher(
+        type = FileKitType.File(extensions = importVideoExtensions),
+        mode = FileKitMode.Multiple(),
+    ) { files ->
+        if (!files.isNullOrEmpty()) {
+            importCandidateFiles = files
+            showImportSubjectPicker = true
+        }
+    }
+
+    if (showImportSubjectPicker) {
+        ImportSubjectPickerDialog(
+            pager = vm.importSubjectsPager,
+            onDismiss = { showImportSubjectPicker = false },
+            onSelect = {
+                showImportSubjectPicker = false
+                importSubject = it
+            },
+        )
+    }
+
+    importSubject?.let { subject ->
+        val importEpisodes by produceState<List<EpisodeInfo>?>(null, subject.subjectId) {
+            value = runCatching { vm.loadEpisodesForImport(subject.subjectId) }.getOrNull()
+        }
+        when (val episodes = importEpisodes) {
+            null -> AlertDialog(
+                onDismissRequest = { importSubject = null },
+                title = { Text(subject.subjectInfo.displayName) },
+                text = {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                },
+                confirmButton = {},
+            )
+
+            else -> LocalMediaImportDialog(
+                files = importCandidateFiles,
+                episodes = episodes,
+                subjectTitle = subject.subjectInfo.displayName,
+                onDismissRequest = {
+                    importSubject = null
+                    importCandidateFiles = emptyList()
+                },
+                onConfirm = { candidates ->
+                    importSubject = null
+                    val items = candidates.mapNotNull { candidate ->
+                        val ep = candidate.targetEpisode ?: return@mapNotNull null
+                        LocalImportFileItem(
+                            filePath = candidate.filePath,
+                            filename = candidate.filename,
+                            episodeSort = ep.sort,
+                            episodeId = ep.episodeId,
+                            episodeTitle = ep.displayName,
+                        )
+                    }
+                    if (items.isEmpty()) return@LocalMediaImportDialog
+                    scope.launch {
+                        val importedCount = vm.importLocalFiles(subject.subjectInfo, items)
+                        toaster.show(
+                            if (importedCount > 0) {
+                                importSuccessTemplate
+                                    .replace("%1\$d", importedCount.toString())
+                                    .replace("%d", importedCount.toString())
+                            } else {
+                                alreadyImportedText
+                            },
+                        )
+                    }
+                },
+            )
+        }
+    }
+    // endregion
+
     CacheManagementScreen(
         state,
         selfInfo,
@@ -181,6 +288,7 @@ fun CacheManagementScreen(
         onDelete = { vm.deleteCache(it) },
         onViewDetail = { onNavigateCacheDetail(it.cacheId) },
         onClickLogin = onClickLogin,
+        onImportLocalFiles = { importFilePickerLauncher.launch() },
         modifier = modifier,
         navigationIcon = navigationIcon,
         windowInsets = windowInsets,
@@ -215,6 +323,7 @@ fun CacheManagementScreen(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
+    onImportLocalFiles: (() -> Unit)? = null,
     detailPaneContent: (@Composable PaneScope.(group: CacheGroupState?, selectionState: CacheSelectionState) -> Unit)? = null,
 ) {
     val appBarColors = AniThemeDefaults.topAppBarColors()
@@ -322,6 +431,7 @@ fun CacheManagementScreen(
                 },
                 selfInfo = selfInfo,
                 onClickLogin = onClickLogin,
+                onImportLocalFiles = onImportLocalFiles,
                 navigationIcon = navigationIcon,
                 appBarColors = appBarColors,
                 windowInsets = AniWindowInsets.forTopAppBarWithoutDesktopTitle(),
@@ -640,6 +750,7 @@ private fun CacheManagementTopBar(
     onToggleSelectAll: () -> Unit,
     selfInfo: SelfInfoUiState?,
     onClickLogin: () -> Unit,
+    onImportLocalFiles: (() -> Unit)? = null,
     navigationIcon: @Composable () -> Unit,
     appBarColors: TopAppBarColors,
     windowInsets: WindowInsets,
@@ -689,6 +800,12 @@ private fun CacheManagementTopBar(
             title = { AniTopAppBarDefaults.Title(stringResource(Lang.main_screen_page_cache_management)) },
             navigationIcon = navigationIcon,
             actions = {
+                if (onImportLocalFiles != null) {
+                    val importLocalMediaText = stringResource(Lang.cache_import_local_media)
+                    IconButton(onClick = onImportLocalFiles) {
+                        Icon(Icons.Rounded.FileOpen, importLocalMediaText)
+                    }
+                }
                 val enterSelectionModeText = stringResource(Lang.cache_management_enter_selection_mode)
                 IconButton(
                     onClick = onEnterSelection,
