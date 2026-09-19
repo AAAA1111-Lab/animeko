@@ -27,8 +27,7 @@ jobs:
             exit 0
           fi
           gh run download 34481097772 -n ani-windows-x64-portable --repo "$GITHUB_REPOSITORY"
-          ls -R .
-          (cd ani-windows-x64-portable && zip -r ../Animeko-6.1.0-windows-x64.zip .)
+          zip -r Animeko-6.1.0-windows-x64.zip .
           gh release upload 6.1.0 Animeko-6.1.0-windows-x64.zip --clobber --repo "$GITHUB_REPOSITORY"
           echo "恢复完成, 当前 6.1.0 资产:"
           gh release view 6.1.0 --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'
