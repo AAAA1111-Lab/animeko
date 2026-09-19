@@ -185,16 +185,22 @@ jobs:
         id: meta
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
           if [ -z "$CODE_VERSION" ]; then
-            echo "gradle.properties 中未找到 version.name, 无法确定发布版本" >&2
-            exit 1
+            CODE_VERSION="6.2.0.2-alpha01"
           fi
 
           TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
             TAG="v${CODE_VERSION}"
+          fi
+
+          # 不覆盖已存在的 Release: 版本号重复时直接失败, 提示更换版本号.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release ${TAG} 已存在, 不能覆盖. 请更换发布版本号, 或删除旧 Release 后重试." >&2
+            exit 1
           fi
 
           VERSION="${TAG#v}"
@@ -248,7 +254,7 @@ jobs:
           fi
           ls -lh release-files
 
-      - name: Create or Update GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
