@@ -168,7 +168,8 @@ jobs:
   publish-release:
     name: 'Publish to GitHub Release'
     needs: [build-android, build-windows]
-    if: ${{ always() && (needs.build-android.result == 'success' || needs.build-windows.result == 'success') }}
+    # 仅在所有实际执行 (未跳过) 的构建任务全部成功时发布; 任一构建失败或取消都不会再走发布流程.
+    if: ${{ !cancelled() && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped') && (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
