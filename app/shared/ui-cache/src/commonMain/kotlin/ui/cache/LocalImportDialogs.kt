@@ -55,6 +55,7 @@ import me.him188.ani.app.ui.lang.cache_import_mode_collection
 import me.him188.ani.app.ui.lang.cache_import_mode_collection_desc
 import me.him188.ani.app.ui.lang.cache_import_mode_title
 import me.him188.ani.app.ui.lang.cache_import_search_hint
+import me.him188.ani.app.ui.lang.cache_import_select_subject
 import org.jetbrains.compose.resources.stringResource
 
 /**

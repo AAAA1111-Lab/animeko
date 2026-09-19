@@ -194,7 +194,7 @@ jobs:
 
           TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
-            TAG="v${CODE_VERSION}"
+            TAG="$CODE_VERSION"
           fi
 
           VERSION="${TAG#v}"
