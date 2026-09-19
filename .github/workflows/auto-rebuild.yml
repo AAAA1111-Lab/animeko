@@ -1,0 +1,25 @@
+name: Auto rebuild after fix (temp)
+
+# 临时桥接: 修复推送到 main 后自动重新触发 manual-build 构建.
+# 监控任务确认构建通过后本文件会被删除 (删除 push 不会触发本 workflow).
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger manual build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run manual-build.yml --repo "$GITHUB_REPOSITORY" --ref main
+          echo "已触发 manual-build (main)"
