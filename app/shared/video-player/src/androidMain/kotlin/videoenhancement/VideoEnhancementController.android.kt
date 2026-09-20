@@ -76,6 +76,7 @@ private class ExoPlayerVideoEnhancementController(
             buildList {
                 when (mode) {
                     VideoEnhancementMode.OFF -> Unit
+                    VideoEnhancementMode.FAST -> add(ContrastAdaptiveSharpenEffect)
                     VideoEnhancementMode.PERFORMANCE -> add(Anime4kRestoreEffect)
                     VideoEnhancementMode.QUALITY -> {
                         add(Anime4kRestoreQualityEffect)

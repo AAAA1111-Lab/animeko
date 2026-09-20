@@ -65,6 +65,9 @@ private class MpvVideoEnhancementController(
 
         val shaderPaths = when (targetMode) {
             VideoEnhancementMode.OFF -> emptyList()
+            VideoEnhancementMode.FAST -> listOf(
+                VideoEnhancementShaderProvider.getShaderPath(casShaderName),
+            )
             VideoEnhancementMode.PERFORMANCE -> listOf(
                 VideoEnhancementShaderProvider.getShaderPath(anime4kRestoreShaderName),
             )
@@ -104,6 +107,7 @@ private class MpvVideoEnhancementController(
             removeAnime4kShadersLocked()
             val properties = when (targetMode) {
                 VideoEnhancementMode.OFF -> originalProperties
+                VideoEnhancementMode.FAST,
                 VideoEnhancementMode.PERFORMANCE,
                 VideoEnhancementMode.QUALITY,
                     -> clearProperties
@@ -151,6 +155,7 @@ private class MpvVideoEnhancementController(
     }
 }
 
+private const val casShaderName = "CAS.glsl"
 private const val anime4kRestoreShaderName = "Anime4K_Restore_CNN_S.glsl"
 
 private val anime4kQualityShaderNames = listOf(

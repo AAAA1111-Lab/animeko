@@ -36,8 +36,9 @@ fun VideoEnhancementDropdown(
 ) {
     val mode by videoEnhancement.mode.collectAsState()
     val title = stringResource(Lang.video_player_video_enhancement)
-    val performanceText = stringResource(Lang.video_player_performance)
     val qualityText = stringResource(Lang.video_player_quality)
+    val performanceText = stringResource(Lang.video_player_performance)
+    val fastText = stringResource(Lang.video_player_fast)
     val offText = stringResource(Lang.video_player_off)
 
     DropdownMenu(
@@ -50,8 +51,9 @@ fun VideoEnhancementDropdown(
             style = MaterialTheme.typography.titleSmall,
         )
         listOf(
-            VideoEnhancementMode.PERFORMANCE,
             VideoEnhancementMode.QUALITY,
+            VideoEnhancementMode.PERFORMANCE,
+            VideoEnhancementMode.FAST,
             VideoEnhancementMode.OFF,
         ).forEach { item ->
             DropdownMenuItem(
@@ -59,6 +61,7 @@ fun VideoEnhancementDropdown(
                     Text(
                         when (item) {
                             VideoEnhancementMode.OFF -> offText
+                            VideoEnhancementMode.FAST -> fastText
                             VideoEnhancementMode.PERFORMANCE -> performanceText
                             VideoEnhancementMode.QUALITY -> qualityText
                         },

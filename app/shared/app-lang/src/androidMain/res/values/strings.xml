@@ -684,6 +684,7 @@
     <string name="video_player_audio_track">Audio</string>
     <string name="video_player_off">Off</string>
     <string name="video_player_on">On</string>
+    <string name="video_player_fast">Lightweight sharpening</string>
     <string name="video_player_performance">Prioritize performance</string>
     <string name="video_player_quality">Highest quality</string>
     <string name="video_player_video_enhancement">Video enhancement</string>

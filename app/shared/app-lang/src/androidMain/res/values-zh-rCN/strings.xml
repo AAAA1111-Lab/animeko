@@ -724,6 +724,7 @@
     <string name="video_player_audio_track">音轨</string>
     <string name="video_player_off">关闭</string>
     <string name="video_player_on">开启</string>
+    <string name="video_player_fast">轻量锐化</string>
     <string name="video_player_performance">性能优先</string>
     <string name="video_player_quality">最高质量</string>
     <string name="video_player_video_enhancement">画质增强</string>
