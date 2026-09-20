@@ -245,11 +245,7 @@ fun CacheManagementScreen(
             onDismiss = { dismissImportDialogs() },
             onSelect = {
                 showImportCollectionPicker = false
-                importSubjectCandidate = ImportSubjectCandidate(
-                    it.subjectId,
-                    it.subjectInfo.displayName,
-                    it.subjectInfo.imageLarge,
-                )
+                importSubjectCandidate = it
             },
         )
     }
