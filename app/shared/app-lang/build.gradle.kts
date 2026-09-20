@@ -7,6 +7,8 @@
  * https://github.com/open-ani/ani/blob/main/LICENSE
  */
 
+import org.gradle.api.tasks.PathSensitivity
+
 plugins {
     id("ani.kmp-compose")
     alias(libs.plugins.kotlin.plugin.serialization)
@@ -41,6 +43,11 @@ compose.resources {
         },
     )
 }
+
+// Compose 资源生成只从 `customDirectory` 里读取字符串, 而该目录是 `src` 下的源目录.
+// 这里额外把整棵 res 目录显式声明为这些任务的输入, 保证改动 strings*.xml 后它们一定重新执行,
+// 不会被"最新检查"/构建缓存跳过而留下过期的资源访问器 (Res.string.xxx 解析不到).
+val stringResourceSourceDir = layout.projectDirectory.dir("src/androidMain/res")
 
 val populateStringsLocales by tasks.registering(Copy::class) {
     group = "ani"
@@ -86,6 +93,22 @@ tasks.matching {
             || (it.name.startsWith("map") && it.name.endsWith("SourceSetPaths")) // mapReleaseSourceSetPaths
 }.configureEach {
     dependsOn(populateStringsLocales)
+}
+
+// 资源访问器生成的输入是 `customDirectory` (src/androidMain/res) 下的 XML. 该目录由
+// populateStringsLocales 写入, 所以这里既把它声明为显式输入, 又保证排在写入之后:
+// 只依赖 Compose 插件自己记录的输入时, 改动 strings*.xml 有可能被最新检查/构建缓存跳过,
+// 生成出缺少新字符串的访问器, 让 `Lang.xxx` 在编译期解析不到.
+tasks.matching {
+    it.name.startsWith("convertXmlValueResources")
+            || it.name.startsWith("copyNonXmlValueResources")
+            || it.name.startsWith("prepareComposeResourcesTask")
+            || it.name.startsWith("generateResourceAccessors")
+}.configureEach {
+    inputs.dir(stringResourceSourceDir)
+        .withPropertyName("aniStringResourceSourceDir")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    mustRunAfter(populateStringsLocales)
 }
 
 idea {

@@ -686,6 +686,7 @@
     <string name="video_player_audio_track">音軌</string>
     <string name="video_player_off">關閉</string>
     <string name="video_player_on">開啟</string>
+    <string name="video_player_fast">輕量銳化</string>
     <string name="video_player_performance">效能優先</string>
     <string name="video_player_quality">最高品質</string>
     <string name="video_player_video_enhancement">畫質增強</string>
