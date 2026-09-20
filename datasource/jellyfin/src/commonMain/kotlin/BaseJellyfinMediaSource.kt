@@ -435,7 +435,7 @@ abstract class BaseJellyfinMediaSource(
                 mediaSourceId = mediaSourceId,
                 originalUrl = "$baseUrl/Items/$Id",
                 download = ResourceLocation.HttpStreamingFile(
-                    uri = getStreamUri(Id, Container, accessToken, MediaStreams),
+                    uri = getDownloadUri(Id, accessToken),
                 ),
                 originalTitle = originalTitle,
                 publishedTime = 0,
@@ -464,27 +464,7 @@ abstract class BaseJellyfinMediaSource(
     }
 
     protected open fun getStreamUri(itemId: String, container: String?, accessToken: String): String {
-        return getStreamUri(itemId, container, accessToken, emptyList())
-    }
-
-    protected open fun getStreamUri(
-        itemId: String,
-        container: String?,
-        accessToken: String,
-        mediaStreams: List<MediaStream>,
-    ): String {
-        val ext = container?.split(",")?.firstOrNull()?.trim()?.removePrefix(".")?.takeIf { it.isNotEmpty() }
-        val streamPath = if (ext != null) "stream.$ext" else "stream"
-        val needsAudioTranscode = mediaStreams.any { stream ->
-            stream.Type.equals("Audio", ignoreCase = true) &&
-                stream.Codec?.lowercase() in INCOMPATIBLE_AUDIO_CODECS
-        }
-        val playbackParams = if (needsAudioTranscode) {
-            "AudioCodec=aac"
-        } else {
-            "static=true"
-        }
-        return "$baseUrl/Videos/$itemId/$streamPath?$playbackParams&ApiKey=$accessToken&api_key=$accessToken"
+        return getDownloadUri(itemId, accessToken)
     }
 
     protected abstract fun getDownloadUri(itemId: String, accessToken: String): String
@@ -876,10 +856,3 @@ private data class Item(
     val ProviderIds: Map<String, String> = emptyMap(),
     val MediaStreams: List<MediaStream> = emptyList(),
 )
-
-/**
- * Audio codecs that are either unsupported or unreliable for direct playback in Android
- * system decoders (such as FLAC in Matroska containers on Android 8.0/API 26, DTS, TrueHD).
- * For these codecs, request Jellyfin to direct-stream video while transcoding audio to AAC.
- */
-private val INCOMPATIBLE_AUDIO_CODECS = setOf("flac", "truehd", "dts", "dca", "alac", "mlp")

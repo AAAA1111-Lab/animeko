@@ -448,94 +448,10 @@ class JellyfinMediaSourceAuthenticationTest {
         val download = assertIs<ResourceLocation.HttpStreamingFile>(media.download)
 
         assertEquals(
-            "$TEST_BASE_URL/Videos/episode-1/stream?static=true&ApiKey=playback-session-token&api_key=playback-session-token",
+            "$TEST_BASE_URL/Items/episode-1/Download?ApiKey=playback-session-token",
             download.uri,
         )
         assertEquals(1, loginCount)
-    }
-
-    @Test
-    fun `fetch creates an audio-transcoded download url when FLAC audio is present`() = runTest {
-        val source = JellyfinMediaSource(
-            config = passwordConfig(),
-            client = mockClient { request ->
-                when (request.url.encodedPath) {
-                    "/Users/AuthenticateByName" -> respondJson(
-                        """
-                        {
-                          "AccessToken": "playback-session-token",
-                          "User": { "Id": "session-user-id" }
-                        }
-                        """.trimIndent(),
-                    )
-
-                    "/Items" -> {
-                        val fields = request.url.parameters["fields"]
-                        if (fields == "MediaStreams") {
-                            respondJson(
-                                """
-                                {
-                                  "Items": [
-                                    {
-                                      "Name": "Episode 1",
-                                      "Id": "episode-1",
-                                      "Type": "Episode",
-                                      "Container": "mkv",
-                                      "MediaStreams": [
-                                        {
-                                          "Type": "Video",
-                                          "Codec": "hevc",
-                                          "Index": 0,
-                                          "IsExternal": false,
-                                          "IsTextSubtitleStream": false
-                                        },
-                                        {
-                                          "Type": "Audio",
-                                          "Codec": "flac",
-                                          "Index": 1,
-                                          "IsExternal": false,
-                                          "IsTextSubtitleStream": false
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                                """.trimIndent(),
-                            )
-                        } else {
-                            respondJson(
-                                """
-                                {
-                                  "Items": [
-                                    {
-                                      "Name": "Episode 1",
-                                      "SeriesName": "Test Anime",
-                                      "Id": "episode-1",
-                                      "IndexNumber": 1,
-                                      "Container": "mkv",
-                                      "Type": "Episode"
-                                    }
-                                  ]
-                                }
-                                """.trimIndent(),
-                            )
-                        }
-                    }
-
-                    else -> error("Unexpected request: ${request.url}")
-                }
-            },
-        )
-
-        val pagedSource = assertIs<PagedSource<MediaMatch>>(source.fetch(testRequest()))
-        val results = assertNotNull(pagedSource.nextPageOrNull())
-        val media = results.single().media
-        val download = assertIs<ResourceLocation.HttpStreamingFile>(media.download)
-
-        assertEquals(
-            "$TEST_BASE_URL/Videos/episode-1/stream.mkv?AudioCodec=aac&ApiKey=playback-session-token&api_key=playback-session-token",
-            download.uri,
-        )
     }
 
     @Test
