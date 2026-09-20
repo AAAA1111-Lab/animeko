@@ -24,31 +24,42 @@ import me.him188.ani.utils.video.enhancement.shader.provider.VideoEnhancementSha
 import kotlin.math.roundToInt
 
 /**
- * A single-pass radial EWA approximation of mpv's `ewa_lanczossharp` presentation chain.
+ * Mobile-friendly upscaler used by the Android enhancement chain.
  *
- * It uses mpv's Jinc radius and sharp blur, sigmoid upscaling, and 0.7 anti-ringing while
- * avoiding a second full-size intermediate texture on mobile GPUs.
+ * The desktop chain relies on mpv's `ewa_lanczossharp`. Emulating it in ExoPlayer (the removed
+ * `DesktopStyleLanczosSharpEffect`) evaluates an 8x8 neighbourhood plus a sigmoid transfer function
+ * and an anti-ringing clamp for every output pixel, which is a large cost once the viewport is 4k.
+ * This effect keeps the scaling job (which the compositor would otherwise do with a plain bilinear
+ * stretch) but uses a separable Lanczos-2 kernel (`lanczos2.frag`): 9 texture fetches and no
+ * transcendentals per pixel.
  */
-internal class DesktopStyleLanczosSharpEffect(
+internal class MobileLanczosScaleEffect(
     private val viewportWidth: Int,
     private val viewportHeight: Int,
 ) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram =
-        DesktopStyleLanczosSharpShaderProgram(context, viewportWidth, viewportHeight)
+        MobileLanczosScaleShaderProgram(context, viewportWidth, viewportHeight)
 }
 
-private class DesktopStyleLanczosSharpShaderProgram(
+private class MobileLanczosScaleShaderProgram(
     context: Context,
     private val viewportWidth: Int,
     private val viewportHeight: Int,
 ) : BaseGlShaderProgram(
-    /* useHighPrecisionColorComponents = */ true,
+    /* useHighPrecisionColorComponents = */ false,
     /* texturePoolCapacity = */ 1,
 ) {
-    val shaderSources = LanczosSharpShaderSources(context)
-
     private val program = try {
-        GlProgram(shaderSources.vertexShader, shaderSources.fragmentShader).also {
+        GlProgram(
+            VideoEnhancementShaderProvider.getShaderSource(
+                context,
+                "$exoEffectShaderDirectory/ewa_lanczossharp.vert",
+            ),
+            VideoEnhancementShaderProvider.getShaderSource(
+                context,
+                "$exoEffectShaderDirectory/lanczos2.frag",
+            ),
+        ).also {
             it.setBufferAttribute(
                 "aFramePosition",
                 GlUtil.getNormalizedCoordinateBounds(),
@@ -56,7 +67,7 @@ private class DesktopStyleLanczosSharpShaderProgram(
             )
         }
     } catch (e: GlUtil.GlException) {
-        throw VideoFrameProcessingException("Could not compile desktop-style Lanczos sharp effect", e)
+        throw VideoFrameProcessingException("Could not compile mobile Lanczos scale effect", e)
     }
 
     private var inputWidth = 0
@@ -95,20 +106,8 @@ private class DesktopStyleLanczosSharpShaderProgram(
         try {
             program.delete()
         } catch (e: GlUtil.GlException) {
-            throw VideoFrameProcessingException("Could not release desktop-style Lanczos sharp effect", e)
+            throw VideoFrameProcessingException("Could not release mobile Lanczos scale effect", e)
         }
         super.release()
     }
-}
-
-
-private class LanczosSharpShaderSources(context: Context) {
-    val vertexShader = VideoEnhancementShaderProvider.getShaderSource(
-        context,
-        "$exoEffectShaderDirectory/ewa_lanczossharp.vert",
-    )
-    val fragmentShader = VideoEnhancementShaderProvider.getShaderSource(
-        context,
-        "$exoEffectShaderDirectory/ewa_lanczossharp.frag",
-    )
 }

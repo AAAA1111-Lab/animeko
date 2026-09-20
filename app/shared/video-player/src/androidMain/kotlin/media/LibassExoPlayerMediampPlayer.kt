@@ -211,6 +211,7 @@ private class LibassMediaSourcePipeline(
     private val subtitleParserFactory = AssSubtitleParserFactory(assHandler)
     private val extractorsFactory = DefaultExtractorsFactory()
         .withAssMkvSupport(subtitleParserFactory, assHandler)
+        .normalizingFlacFormats()
 
     fun intercept(defaultSource: MediaSource, data: MediaData): MediaSource =
         createLibassMediaSource(data) ?: defaultSource

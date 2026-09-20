@@ -41,7 +41,6 @@ import me.him188.ani.datasources.api.topic.FileSize
 import me.him188.ani.datasources.api.topic.ResourceLocation
 import me.him188.ani.utils.ktor.ScopedHttpClient
 import me.him188.ani.utils.logging.warn
-import me.him188.ani.utils.platform.isAudioCodecSupported
 
 private const val TYPE_EPISODE = "Episode"
 private const val TYPE_MOVIE = "Movie"
@@ -436,7 +435,7 @@ abstract class BaseJellyfinMediaSource(
                 mediaSourceId = mediaSourceId,
                 originalUrl = "$baseUrl/Items/$Id",
                 download = ResourceLocation.HttpStreamingFile(
-                    uri = getStreamUri(Id, Container, accessToken, MediaStreams),
+                    uri = getDownloadUri(Id, accessToken),
                 ),
                 originalTitle = originalTitle,
                 publishedTime = 0,
@@ -466,28 +465,6 @@ abstract class BaseJellyfinMediaSource(
 
     protected open fun getStreamUri(itemId: String, container: String?, accessToken: String): String {
         return getDownloadUri(itemId, accessToken)
-    }
-
-    /**
-     * 构造直接播放的地址.
-     *
-     * 当音轨是本机无法解码的编码 (例如 Android 8.0/API 26 上的 FLAC) 时, 请求服务端把音频转码成
-     * AAC, 视频仍然直接串流. 否则保持原始串流, 避免服务端做无谓的转码.
-     */
-    private fun getStreamUri(
-        itemId: String,
-        container: String?,
-        accessToken: String,
-        mediaStreams: List<MediaStream>,
-    ): String {
-        val needsAudioTranscode = mediaStreams.any { stream ->
-            stream.Type.equals("Audio", ignoreCase = true) &&
-                stream.Codec?.let { !isAudioCodecSupported(it) } == true
-        }
-        if (!needsAudioTranscode) {
-            return getStreamUri(itemId, container, accessToken)
-        }
-        return buildJellyfinTranscodeAudioUri(baseUrl, itemId, container, accessToken)
     }
 
     protected abstract fun getDownloadUri(itemId: String, accessToken: String): String
@@ -879,19 +856,3 @@ private data class Item(
     val ProviderIds: Map<String, String> = emptyMap(),
     val MediaStreams: List<MediaStream> = emptyList(),
 )
-
-/**
- * 请求 Jellyfin 保留原始视频轨, 只把音频转码为 AAC 的串流地址.
- *
- * 服务端不接受 `static=true` 与 `AudioCodec` 同时出现, 因此这里不带 `static=true`.
- */
-internal fun buildJellyfinTranscodeAudioUri(
-    baseUrl: String,
-    itemId: String,
-    container: String?,
-    accessToken: String,
-): String {
-    val ext = container?.split(",")?.firstOrNull()?.trim()?.removePrefix(".")?.takeIf { it.isNotEmpty() }
-    val streamPath = if (ext != null) "stream.$ext" else "stream"
-    return "$baseUrl/Videos/$itemId/$streamPath?AudioCodec=aac&ApiKey=$accessToken&api_key=$accessToken"
-}

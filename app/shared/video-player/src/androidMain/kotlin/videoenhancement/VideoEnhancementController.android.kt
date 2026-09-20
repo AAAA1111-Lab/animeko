@@ -67,7 +67,7 @@ private class ExoPlayerVideoEnhancementController(
             return
         }
 
-        val scalerTarget = lanczosSharpScalerTarget(videoSize, viewportSize)
+        val scalerTarget = enhancedOutputTarget(videoSize, viewportSize)
         val scalerAppliedNow = scalerTarget != null
         if (
             appliedMode == mode && scalerApplied == scalerAppliedNow &&
@@ -86,7 +86,7 @@ private class ExoPlayerVideoEnhancementController(
                     }
                 }
                 if (scalerTarget != null) {
-                    add(DesktopStyleLanczosSharpEffect(scalerTarget.width, scalerTarget.height))
+                    add(MobileLanczosScaleEffect(scalerTarget.width, scalerTarget.height))
                 }
             },
         )
@@ -107,14 +107,13 @@ private class ExoPlayerVideoEnhancementController(
 }
 
 /**
- * `ewa_lanczossharp` 缩放的目标尺寸, `null` 表示不叠加这一层.
+ * 缩放层的目标尺寸, `null` 表示不叠加这一层.
  *
- * 该 shader 每个输出像素要采样约 8x8 邻域 (含 sigmoid 与 anti-ringing), 是整条链里最贵的一步.
- * 只有在"确实需要放大"且放大后的输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时才使用它:
- * 4K 屏上看 1080p (输出约 830 万像素) 会直接跳过, 交给平台的硬件缩放完成剩余放大,
- * 否则中端 GPU (例如骁龙 845) 会持续掉帧.
+ * 只有"确实需要放大"且放大后的输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时才启用:
+ * 超大输出会让整条效果链在极高分辦率下重跑, 分辨率越高收益越小、代价越大.
+ * 输出规模在预算内时由 [MobileLanczosScaleEffect] 以可分离 Lanczos-2 完成放大.
  */
-private fun lanczosSharpScalerTarget(
+private fun enhancedOutputTarget(
     videoSize: VideoDimensions?,
     viewportSize: VideoDimensions?,
 ): VideoDimensions? {
@@ -130,7 +129,7 @@ private fun lanczosSharpScalerTarget(
     return VideoDimensions(outputWidth, outputHeight)
 }
 
-/** 1080p. 超过这个输出规模时, 增强链改由平台硬件缩放收尾. */
-private const val MAX_ENHANCED_OUTPUT_PIXELS = 1920L * 1080L
+/** 4K. 超过这个输出规模时, 增强链改由平台硬件缩放收尾. */
+private const val MAX_ENHANCED_OUTPUT_PIXELS = 3840L * 2160L
 
 internal const val exoEffectShaderDirectory = "exo-effects"
