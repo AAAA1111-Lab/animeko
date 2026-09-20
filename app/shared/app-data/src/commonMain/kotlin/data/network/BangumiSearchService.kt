@@ -112,7 +112,10 @@ data class BangumiSubjectSearchResult(
 )
 
 fun BangumiSubjectSearchResult.toBatchSubjectDetails(): BatchSubjectDetails {
-    val airDate = date?.takeIf { it.isNotBlank() }?.let { PackedDate.parseFromDate(it) } ?: PackedDate.EMPTY
+    val airDate = date?.takeIf { it.isNotBlank() }?.let { PackedDate.parseFromDate(it) } ?: PackedDate.Invalid
+    val scoreStr = score?.let {
+        if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()
+    } ?: ""
     return BatchSubjectDetails(
         subjectInfo = SubjectInfo(
             subjectId = subjectId,
@@ -125,13 +128,15 @@ fun BangumiSubjectSearchResult.toBatchSubjectDetails(): BatchSubjectDetails {
             totalEpisodes = eps ?: 0,
             airDate = airDate,
             tags = emptyList(),
-            collectionStats = SubjectCollectionStats.EMPTY,
+            aliases = emptyList(),
             ratingInfo = RatingInfo(
-                score = score ?: 0.0,
                 rank = rank ?: 0,
                 total = 0,
-                counts = RatingCounts.EMPTY,
+                count = RatingCounts.Zero,
+                score = scoreStr,
             ),
+            collectionStats = SubjectCollectionStats.Zero,
+            completeDate = PackedDate.Invalid,
         ),
         mainEpisodeCount = eps ?: 0,
         lightSubjectRelations = LightSubjectRelations(

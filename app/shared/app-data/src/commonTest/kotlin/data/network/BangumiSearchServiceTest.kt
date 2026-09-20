@@ -85,7 +85,7 @@ class BangumiSearchServiceTest {
         assertEquals("葬送的芙莉莲", batchDetails.subjectInfo.nameCn)
         assertEquals("葬送のフリーレン", batchDetails.subjectInfo.name)
         assertEquals(28, batchDetails.mainEpisodeCount)
-        assertEquals(8.9, batchDetails.subjectInfo.ratingInfo.score)
+        assertEquals("8.9", batchDetails.subjectInfo.ratingInfo.score)
         assertEquals(3, batchDetails.subjectInfo.ratingInfo.rank)
     }
 

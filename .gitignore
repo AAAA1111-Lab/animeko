@@ -41,6 +41,7 @@ kls_database.db
 /torrent/anitorrent/*.dll
 /torrent/anitorrent/*.so
 log.txt
+log_*.txt
 *.log
 /app/ios/Animeko/GoogleService-Info.plist
 /app/ios/12.4.0
