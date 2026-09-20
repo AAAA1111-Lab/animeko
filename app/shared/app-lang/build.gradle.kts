@@ -96,19 +96,25 @@ tasks.matching {
 }
 
 // 资源访问器生成的输入是 `customDirectory` (src/androidMain/res) 下的 XML. 该目录由
-// populateStringsLocales 写入, 所以这里既把它声明为显式输入, 又保证排在写入之后:
-// 只依赖 Compose 插件自己记录的输入时, 改动 strings*.xml 有可能被最新检查/构建缓存跳过,
-// 生成出缺少新字符串的访问器, 让 `Lang.xxx` 在编译期解析不到.
-tasks.matching {
+// populateStringsLocales 写入, 所以这里既把它声明为显式输入, 又保证排在写入之后.
+// 另外显式关掉最新检查: 这几个任务本身不用构建缓存 (Caching disabled), 一旦被判定为"最新",
+// 就会沿用上一轮(甚至是别的 commit)生成的访问器, 新加的字符串不会出现在 Res.string 里,
+// 编译期报 `Unresolved reference: xxx` 而源码完全正确. 它们只读 XML 做文本生成, 重跑代价很小.
+val stringResourceTasks = tasks.matching {
     it.name.startsWith("convertXmlValueResources")
             || it.name.startsWith("copyNonXmlValueResources")
             || it.name.startsWith("prepareComposeResourcesTask")
             || it.name.startsWith("generateResourceAccessors")
-}.configureEach {
+}
+stringResourceTasks.configureEach {
     inputs.dir(stringResourceSourceDir)
         .withPropertyName("aniStringResourceSourceDir")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     mustRunAfter(populateStringsLocales)
+}
+// 只对"生成访问器"这一步关掉最新检查: 它决定 Res.string 里有哪些条目, 一旦跳过就会沿用旧结果.
+stringResourceTasks.matching { it.name.startsWith("generateResourceAccessors") }.configureEach {
+    outputs.upToDateWhen { false }
 }
 
 idea {
