@@ -435,7 +435,7 @@ abstract class BaseJellyfinMediaSource(
                 mediaSourceId = mediaSourceId,
                 originalUrl = "$baseUrl/Items/$Id",
                 download = ResourceLocation.HttpStreamingFile(
-                    uri = getDownloadUri(Id, accessToken),
+                    uri = getStreamUri(Id, Container, accessToken),
                 ),
                 originalTitle = originalTitle,
                 publishedTime = 0,
@@ -449,7 +449,7 @@ abstract class BaseJellyfinMediaSource(
                     subtitleKind = SubtitleKind.EXTERNAL_PROVIDED,
                 ),
                 extraFiles = MediaExtraFiles(
-                    subtitles = getSubtitles(Id, MediaStreams),
+                    subtitles = getSubtitles(Id, MediaStreams, accessToken),
                 ),
                 episodeRange = episodeRange,
                 location = MediaSourceLocation.Lan,
@@ -463,14 +463,20 @@ abstract class BaseJellyfinMediaSource(
         )
     }
 
+    protected open fun getStreamUri(itemId: String, container: String?, accessToken: String): String {
+        val ext = container?.split(",")?.firstOrNull()?.trim()?.removePrefix(".")?.takeIf { it.isNotEmpty() }
+        val streamPath = if (ext != null) "stream.$ext" else "stream"
+        return "$baseUrl/Videos/$itemId/$streamPath?static=true&ApiKey=$accessToken&api_key=$accessToken"
+    }
+
     protected abstract fun getDownloadUri(itemId: String, accessToken: String): String
 
-    private fun getSubtitles(itemId: String, mediaStreams: List<MediaStream>): List<Subtitle> {
+    private fun getSubtitles(itemId: String, mediaStreams: List<MediaStream>, accessToken: String): List<Subtitle> {
         return mediaStreams
             .filter { it.Type == "Subtitle" && it.IsTextSubtitleStream && it.IsExternal && it.Codec != null }
             .map { stream ->
                 Subtitle(
-                    uri = getSubtitleUri(itemId, stream.Index, stream.Codec!!),
+                    uri = getSubtitleUri(itemId, stream.Index, stream.Codec!!, accessToken),
                     language = stream.Language,
                     mimeType = when (stream.Codec.lowercase()) {
                         "ass" -> "text/x-ass"
@@ -481,8 +487,8 @@ abstract class BaseJellyfinMediaSource(
             }
     }
 
-    private fun getSubtitleUri(itemId: String, index: Int, codec: String): String {
-        return "$baseUrl/Videos/$itemId/$itemId/Subtitles/$index/0/Stream.$codec"
+    protected open fun getSubtitleUri(itemId: String, index: Int, codec: String, accessToken: String): String {
+        return "$baseUrl/Videos/$itemId/$itemId/Subtitles/$index/0/Stream.$codec?ApiKey=$accessToken&api_key=$accessToken"
     }
 
     private data class ParsedSubjectName(
@@ -848,6 +854,7 @@ private data class Item(
     val IndexNumber: Int? = null,
     val ParentIndexNumber: Int? = null,
     val Type: String,
+    val Container: String? = null,
     val ProviderIds: Map<String, String> = emptyMap(),
     val MediaStreams: List<MediaStream> = emptyList(),
 )

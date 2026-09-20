@@ -448,7 +448,7 @@ class JellyfinMediaSourceAuthenticationTest {
         val download = assertIs<ResourceLocation.HttpStreamingFile>(media.download)
 
         assertEquals(
-            "$TEST_BASE_URL/Items/episode-1/Download?ApiKey=playback-session-token",
+            "$TEST_BASE_URL/Videos/episode-1/stream?static=true&ApiKey=playback-session-token&api_key=playback-session-token",
             download.uri,
         )
         assertEquals(1, loginCount)

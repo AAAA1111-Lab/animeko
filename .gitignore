@@ -46,3 +46,4 @@ log.txt
 /app/ios/12.4.0
 /app/ios/xcb2.log
 /app/ios/xcodebuild.log
+.zcodeignore

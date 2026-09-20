@@ -321,7 +321,9 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         )
     }
     single {
-        BangumiSearchService()
+        BangumiSearchService(
+            client = get<HttpClientProvider>().get(),
+        )
     }
     single<SubjectSearchRepository> {
         SubjectSearchRepository(
@@ -334,6 +336,7 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         SubjectSearchCompletionRepository(
             aniSubjectSearchService = get(),
             subjectCollectionRepository = get(),
+            bangumiSearchService = get(),
             settingsRepository = get(),
         )
     }

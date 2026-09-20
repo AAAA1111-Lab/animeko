@@ -25,6 +25,7 @@ import me.him188.ani.app.data.network.AniSubjectSearchService
 import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.BangumiSubjectSearchResult
 import me.him188.ani.app.data.network.BatchSubjectDetails
+import me.him188.ani.app.data.network.toBatchSubjectDetails
 import me.him188.ani.app.data.network.SubjectSearchField
 import me.him188.ani.app.data.network.SubjectSearchFilters
 import me.him188.ani.app.data.repository.Repository
@@ -90,14 +91,35 @@ class SubjectSearchRepository(
                     fields = subjectSearchFields,
                 )
 
+                val supplementarySubjects = if (offset == 0 && searchQuery.keywords.isNotBlank()) {
+                    runCatching {
+                        val bgmResults = bangumiSearchService.searchSubjects(
+                            searchQuery.keywords,
+                            limit = params.loadSize,
+                        )
+                        val existingIds = subjects.map { it.subjectInfo.subjectId }.toSet()
+                        bgmResults
+                            .filter { it.subjectId !in existingIds }
+                            .map { it.toBatchSubjectDetails() }
+                    }.getOrDefault(emptyList())
+                } else {
+                    emptyList()
+                }
+
+                val allSubjects = if (subjects.isEmpty()) {
+                    supplementarySubjects
+                } else {
+                    subjects + supplementarySubjects
+                }
+
                 val filteredSubjects = if (ignoreDoneAndDropped()) {
                     val excludedIds = subjectCollectionRepository.getSubjectIdsByCollectionType(
                         types = listOf(UnifiedCollectionType.DONE, UnifiedCollectionType.DROPPED),
                     ).first()
 
-                    subjects.filter { it.subjectInfo.subjectId !in excludedIds }
+                    allSubjects.filter { it.subjectInfo.subjectId !in excludedIds }
                 } else {
-                    subjects
+                    allSubjects
                 }
 
                 // 在分页源中直接过滤掉不符合条件的数据 #2380
@@ -109,7 +131,7 @@ class SubjectSearchRepository(
                 return@withContext LoadResult.Page(
                     subjectInfos,
                     prevKey = if (offset == 0) null else offset,
-                    nextKey = if (subjectInfos.isEmpty()) null else offset + params.loadSize,
+                    nextKey = if (subjects.isEmpty()) null else offset + params.loadSize,
                 )
             } catch (e: CancellationException) {
                 throw e

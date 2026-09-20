@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import me.him188.ani.app.data.models.preference.NsfwMode
 import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.SubjectSearchField
 import me.him188.ani.app.data.network.SubjectSearchFilters
 import me.him188.ani.app.data.repository.Repository
@@ -33,6 +34,7 @@ import me.him188.ani.utils.logging.error
 class SubjectSearchCompletionRepository(
     private val aniSubjectSearchService: AniSubjectSearchService,
     private val subjectCollectionRepository: SubjectCollectionRepository,
+    private val bangumiSearchService: BangumiSearchService,
     settingsRepository: SettingsRepository,
 ) : Repository() {
     private val ignoreDoneAndDroppedFlow =
@@ -72,9 +74,17 @@ class SubjectSearchCompletionRepository(
                         subjects
                     }
 
+                    val bgmCompletions = if (filteredSubjects.isEmpty() && query.isNotBlank()) {
+                        runCatching {
+                            bangumiSearchService.searchSubjects(query, limit = params.loadSize)
+                                .map { it.nameCn.ifBlank { it.name } }
+                        }.getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+
                     LoadResult.Page(
-                        data = filteredSubjects
-                            .map { it.subjectInfo.nameCn.ifEmpty { it.subjectInfo.name } }
+                        data = (filteredSubjects.map { it.subjectInfo.nameCn.ifEmpty { it.subjectInfo.name } } + bgmCompletions)
                             .filter { it.isNotBlank() }
                             .distinct(),
                         prevKey = null,
