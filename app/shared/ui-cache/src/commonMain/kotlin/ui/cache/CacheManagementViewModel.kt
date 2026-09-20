@@ -61,6 +61,7 @@ class CacheManagementViewModel : AbstractViewModel(), KoinComponent {
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
     private val importLocalVideosUseCase: ImportLocalVideosUseCase by inject()
     private val subjectSearchService: AniSubjectSearchService by inject()
+    private val bangumiSearchService: BangumiSearchService by inject()
 
     private val playbackHistoriesByEpisodeId = episodePlayHistoryRepository.flow
         .map { histories -> histories.associateBy { it.episodeId } }

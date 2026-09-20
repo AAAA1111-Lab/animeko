@@ -9,12 +9,12 @@
 
 package me.him188.ani.app.data.network
 
-import io.ktor.client.call.body
-import io.ktor.client.plugins.userAgent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import me.him188.ani.datasources.bangumi.apis.DefaultApi
 import me.him188.ani.datasources.bangumi.models.BangumiSearchSubjectsRequest
+import me.him188.ani.utils.coroutines.IO_
+import me.him188.ani.utils.ktor.userAgent
 import kotlin.coroutines.CoroutineContext
 
 /**
