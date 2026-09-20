@@ -11,6 +11,7 @@ package me.him188.ani.app.videoplayer.media
 
 import android.content.Context
 import android.net.Uri
+import android.os.Looper
 import androidx.annotation.OptIn as AndroidxOptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -38,6 +39,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.openani.mediamp.ExperimentalMediampApi
 import org.openani.mediamp.InternalForInheritanceMediampApi
 import org.openani.mediamp.MediampPlayer
@@ -145,7 +147,13 @@ class LibassExoPlayerMediampPlayer private constructor(
         private fun patchProperties(props: MediaProperties?): MediaProperties? {
             if (props == null) return null
             if (props.videoWidth != null && props.videoHeight != null) return props
-            val displaySize = exoPlayer.videoDisplaySizeOrNull() ?: return props
+            val displaySize = if (Looper.myLooper() == Looper.getMainLooper()) {
+                exoPlayer.videoDisplaySizeOrNull()
+            } else {
+                runBlocking(Dispatchers.Main) {
+                    exoPlayer.videoDisplaySizeOrNull()
+                }
+            } ?: return props
             return props.copy(videoWidth = displaySize.width, videoHeight = displaySize.height)
         }
 

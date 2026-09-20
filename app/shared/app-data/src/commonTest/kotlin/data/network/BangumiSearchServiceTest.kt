@@ -129,4 +129,52 @@ class BangumiSearchServiceTest {
         val batchDetails = item.toBatchSubjectDetails()
         assertEquals("Unknown Anime", batchDetails.subjectInfo.nameCn) // falls back to name if blank
     }
+
+    @Test
+    fun `searchSubjects filters out non-anime items`() = runTest {
+        val mockJson = """
+            {
+              "total": 3,
+              "limit": 10,
+              "offset": 0,
+              "data": [
+                {
+                  "id": 101,
+                  "name": "Anime Item",
+                  "name_cn": "动画条目",
+                  "type": 2
+                },
+                {
+                  "id": 102,
+                  "name": "Book Item",
+                  "name_cn": "书籍条目",
+                  "type": 1
+                },
+                {
+                  "id": 103,
+                  "name": "Game Item",
+                  "name_cn": "游戏条目",
+                  "type": 4
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val client = HttpClient(
+            MockEngine { request ->
+                respond(
+                    content = mockJson,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            },
+        ).asScopedHttpClient()
+
+        val service = BangumiSearchService(client = client)
+        val results = service.searchSubjects("test", limit = 10)
+
+        assertEquals(1, results.size)
+        assertEquals(101, results.first().subjectId)
+        assertEquals("Anime Item", results.first().name)
+    }
 }

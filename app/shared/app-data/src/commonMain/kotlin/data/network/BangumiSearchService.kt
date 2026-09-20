@@ -23,6 +23,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import me.him188.ani.app.data.models.subject.RatingCounts
@@ -57,7 +59,22 @@ class BangumiSearchService(
                         header(HttpHeaders.UserAgent, BGM_SEARCH_USER_AGENT)
                         contentType(ContentType.Application.Json)
                         parameter("limit", limit)
-                        setBody(buildJsonObject { put("keyword", keywords) }.toString())
+                        setBody(
+                            buildJsonObject {
+                                put("keyword", keywords)
+                                put(
+                                    "filter",
+                                    buildJsonObject {
+                                        put(
+                                            "type",
+                                            buildJsonArray {
+                                                add(JsonPrimitive(2))
+                                            },
+                                        )
+                                    },
+                                )
+                            }.toString(),
+                        )
                     }.bodyAsText()
                 }
             } else {
@@ -65,24 +82,41 @@ class BangumiSearchService(
                     header(HttpHeaders.UserAgent, BGM_SEARCH_USER_AGENT)
                     contentType(ContentType.Application.Json)
                     parameter("limit", limit)
-                    setBody(buildJsonObject { put("keyword", keywords) }.toString())
+                    setBody(
+                        buildJsonObject {
+                            put("keyword", keywords)
+                            put(
+                                "filter",
+                                buildJsonObject {
+                                    put(
+                                        "type",
+                                        buildJsonArray {
+                                            add(JsonPrimitive(2))
+                                        },
+                                    )
+                                },
+                            )
+                        }.toString(),
+                    )
                 }.bodyAsText()
             }
 
             val response = json.decodeFromString<BangumiSearchResponse>(responseText)
-            response.data.map {
-                BangumiSubjectSearchResult(
-                    subjectId = it.id,
-                    name = it.name,
-                    nameCn = it.nameCn,
-                    imageUrl = it.image ?: it.images?.large ?: it.images?.common,
-                    summary = it.summary,
-                    date = it.date,
-                    eps = it.eps ?: it.totalEpisodes,
-                    score = it.rating?.score,
-                    rank = it.rating?.rank,
-                )
-            }
+            response.data
+                .filter { it.type == null || it.type == 2 }
+                .map {
+                    BangumiSubjectSearchResult(
+                        subjectId = it.id,
+                        name = it.name,
+                        nameCn = it.nameCn,
+                        imageUrl = it.image ?: it.images?.large ?: it.images?.common,
+                        summary = it.summary,
+                        date = it.date,
+                        eps = it.eps ?: it.totalEpisodes,
+                        score = it.rating?.score,
+                        rank = it.rating?.rank,
+                    )
+                }
         }
 
     private companion object {
@@ -156,6 +190,7 @@ private data class BangumiSearchSubjectItem(
     val id: Int,
     val name: String,
     @SerialName("name_cn") val nameCn: String = "",
+    val type: Int? = null,
     val image: String? = null,
     val images: BangumiSearchImages? = null,
     val summary: String? = null,
