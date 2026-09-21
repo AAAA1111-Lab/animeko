@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import me.him188.ani.app.data.models.preference.PlayerKernelConfig
 import org.openani.mediamp.MediampPlayer
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.roundToInt
 
 actual fun createVideoEnhancementController(
     player: MediampPlayer,
@@ -66,17 +67,17 @@ private class ExoPlayerVideoEnhancementController(
             return
         }
 
-        // 缩放层 (mpv `ewa_lanczossharp` 的模拟实现) 目前不再叠加.
+        // 缩放层: 画质增强的效果本身在源分辨率上执行, 所以必须先放大再交给合成器, 否则合成器会
+        // 用 bilinear 拉伸"已经锐化过"的画面, 把锐化产生的噪点一起放大 (用户实测就是这个观感).
         //
-        // 它在 4K viewport 下要在约 830 万像素上做 8x8 邻域采样 + sigmoid + anti-ringing,
-        // 中端 GPU (骁龙 845) 会持续掉帧; 而尝试过的轻量替代 (单趟可分离 Lanczos-2) 会产生
-        // 摩尔纹/条带. 现在只保留档位本身的增强效果: 它们在源分辨率上执行, 剩余的放大交给
-        // 平台硬件缩放 (bilinear) 收尾 —— 代价是比 Lanczos 略软, 但不会掉帧也不会花屏.
-        //
-        // `DesktopStyleLanczosSharpEffect` 与 `ewa_lanczossharp.frag` 暂时保留, 供之后实现
-        // 正确的轻量两趟可分离缩放时复用.
-        val scalerAppliedNow = false
-        if (appliedMode == mode && scalerApplied == scalerAppliedNow) return
+        // 这里用两趟可分离 Catmull-Rom (每轴 4 抽头 / 共 16 次采样, 无超越函数), 只在"确实需要
+        // 放大"且输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时叠加; 超出预算时交给平台缩放收尾.
+        val scalerTarget = enhancedOutputTarget(videoSize, viewportSize)
+        val scalerAppliedNow = scalerTarget != null
+        if (
+            appliedMode == mode && scalerApplied == scalerAppliedNow &&
+            (scalerTarget == null || appliedWidth == scalerTarget.width && appliedHeight == scalerTarget.height)
+        ) return
 
         exoPlayer.setVideoEffects(
             buildList {
@@ -89,12 +90,15 @@ private class ExoPlayerVideoEnhancementController(
                         add(Anime4kUpscaleQualityEffect)
                     }
                 }
+                if (scalerTarget != null) {
+                    add(CatmullRomScaleEffect(scalerTarget.width, scalerTarget.height))
+                }
             },
         )
         appliedMode = mode
         scalerApplied = scalerAppliedNow
-        appliedWidth = 0
-        appliedHeight = 0
+        appliedWidth = scalerTarget?.width ?: 0
+        appliedHeight = scalerTarget?.height ?: 0
     }
 
     override fun restore() {
@@ -106,5 +110,30 @@ private class ExoPlayerVideoEnhancementController(
         appliedHeight = 0
     }
 }
+
+/**
+ * 缩放层的目标尺寸, `null` 表示不叠加这一层.
+ *
+ * 只有"确实需要放大"且放大后的输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时才启用: 输出越大,
+ * 效果链的固定开销越高, 而 4K 再往上的收益很小. 1080p -> 4K 恰好等于预算, 仍然会走缩放层.
+ */
+private fun enhancedOutputTarget(
+    videoSize: VideoDimensions?,
+    viewportSize: VideoDimensions?,
+): VideoDimensions? {
+    if (videoSize == null || viewportSize == null) return null
+    val scale = minOf(
+        viewportSize.width.toDouble() / videoSize.width,
+        viewportSize.height.toDouble() / videoSize.height,
+    )
+    if (scale <= 1.0) return null // 不需要放大, 不叠加额外的全屏 pass
+    val outputWidth = (videoSize.width * scale).roundToInt().coerceAtLeast(1)
+    val outputHeight = (videoSize.height * scale).roundToInt().coerceAtLeast(1)
+    if (outputWidth.toLong() * outputHeight > MAX_ENHANCED_OUTPUT_PIXELS) return null
+    return VideoDimensions(outputWidth, outputHeight)
+}
+
+/** 4K. 超过这个输出规模时, 增强链改由平台硬件缩放收尾. */
+private const val MAX_ENHANCED_OUTPUT_PIXELS = 3840L * 2160L
 
 internal const val exoEffectShaderDirectory = "exo-effects"
