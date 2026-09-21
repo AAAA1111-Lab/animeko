@@ -1,12 +1,13 @@
 name: Auto rebuild after fix (temp)
 
 # 临时桥接: 修复推送到 main 后自动重新触发 manual-build 构建.
-# 监控任务确认构建通过后本文件会被删除 (删除 push 不会触发本 workflow).
+#
+# 已按需停用: 原先的 `push: main` 触发会在每次推送后自动跑一遍完整构建, 调试期间代价太高.
+# 改成只能手动触发 (Actions 页面 "Run workflow"), 需要时再手动跑 manual-build 即可.
+# 监控任务确认构建通过后本文件会被删除.
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
