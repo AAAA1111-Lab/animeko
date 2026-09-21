@@ -42,8 +42,11 @@ private class DesktopStyleLanczosSharpShaderProgram(
     private val viewportWidth: Int,
     private val viewportHeight: Int,
 ) : BaseGlShaderProgram(
-    /* useHighPrecisionColorComponents = */ true,
-    /* texturePoolCapacity = */ 1,
+    // 8-bit components: this pass writes the final picture, which the platform composites into an
+    // 8-bit surface anyway. Keeping RGBA16F here additionally costs a full extra read+write of the
+    // output at viewport size (about 265 MB/frame at 4K) for no visible benefit.
+    /* useHighPrecisionColorComponents = */ false,
+    /* texturePoolCapacity = */ 2,
 ) {
     val shaderSources = LanczosSharpShaderSources(context)
 
