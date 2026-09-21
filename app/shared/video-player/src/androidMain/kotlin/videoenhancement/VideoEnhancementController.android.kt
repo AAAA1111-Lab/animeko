@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 import me.him188.ani.app.data.models.preference.PlayerKernelConfig
 import org.openani.mediamp.MediampPlayer
 import kotlin.coroutines.CoroutineContext
-import kotlin.math.roundToInt
 
 actual fun createVideoEnhancementController(
     player: MediampPlayer,
@@ -67,33 +66,31 @@ private class ExoPlayerVideoEnhancementController(
             return
         }
 
-        val scalerTarget = lanczosSharpScalerTarget(videoSize, viewportSize)
-        val scalerAppliedNow = scalerTarget != null
+        val shouldApplyScaler = videoSize != null && viewportSize != null
         if (
-            appliedMode == mode && scalerApplied == scalerAppliedNow &&
-            (scalerTarget == null || appliedWidth == scalerTarget.width && appliedHeight == scalerTarget.height)
+            appliedMode == mode && scalerApplied == shouldApplyScaler &&
+            (!shouldApplyScaler || appliedWidth == viewportSize.width && appliedHeight == viewportSize.height)
         ) return
 
         exoPlayer.setVideoEffects(
             buildList {
                 when (mode) {
                     VideoEnhancementMode.OFF -> Unit
-                    VideoEnhancementMode.FAST -> add(ContrastAdaptiveSharpenEffect)
                     VideoEnhancementMode.PERFORMANCE -> add(Anime4kRestoreEffect)
                     VideoEnhancementMode.QUALITY -> {
                         add(Anime4kRestoreQualityEffect)
                         add(Anime4kUpscaleQualityEffect)
                     }
                 }
-                if (scalerTarget != null) {
-                    add(DesktopStyleLanczosSharpEffect(scalerTarget.width, scalerTarget.height))
+                if (shouldApplyScaler) {
+                    add(DesktopStyleLanczosSharpEffect(viewportSize.width, viewportSize.height))
                 }
             },
         )
         appliedMode = mode
-        scalerApplied = scalerAppliedNow
-        appliedWidth = scalerTarget?.width ?: 0
-        appliedHeight = scalerTarget?.height ?: 0
+        scalerApplied = shouldApplyScaler
+        appliedWidth = if (shouldApplyScaler) viewportSize.width else 0
+        appliedHeight = if (shouldApplyScaler) viewportSize.height else 0
     }
 
     override fun restore() {
@@ -105,32 +102,5 @@ private class ExoPlayerVideoEnhancementController(
         appliedHeight = 0
     }
 }
-
-/**
- * `ewa_lanczossharp` 缩放的目标尺寸, `null` 表示不叠加这一层.
- *
- * 该 shader 每个输出像素要采样约 8x8 邻域 (含 sigmoid 与 anti-ringing), 是整条链里最贵的一步.
- * 只有在"确实需要放大"且放大后的输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时才使用它:
- * 4K 屏上看 1080p (输出约 830 万像素) 会直接跳过, 交给平台的硬件缩放完成剩余放大,
- * 否则中端 GPU (例如骁龙 845) 会持续掉帧.
- */
-private fun lanczosSharpScalerTarget(
-    videoSize: VideoDimensions?,
-    viewportSize: VideoDimensions?,
-): VideoDimensions? {
-    if (videoSize == null || viewportSize == null) return null
-    val scale = minOf(
-        viewportSize.width.toDouble() / videoSize.width,
-        viewportSize.height.toDouble() / videoSize.height,
-    )
-    if (scale <= 1.0) return null // 不需要放大, 不叠加额外的全屏 pass
-    val outputWidth = (videoSize.width * scale).roundToInt().coerceAtLeast(1)
-    val outputHeight = (videoSize.height * scale).roundToInt().coerceAtLeast(1)
-    if (outputWidth.toLong() * outputHeight > MAX_ENHANCED_OUTPUT_PIXELS) return null
-    return VideoDimensions(outputWidth, outputHeight)
-}
-
-/** 1080p. 超过这个输出规模时, 增强链改由平台硬件缩放收尾. */
-private const val MAX_ENHANCED_OUTPUT_PIXELS = 1920L * 1080L
 
 internal const val exoEffectShaderDirectory = "exo-effects"

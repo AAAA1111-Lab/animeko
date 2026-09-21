@@ -39,7 +39,6 @@ enum class FullscreenSwitchMode {
 @Serializable
 enum class VideoEnhancementDefaultMode {
     OFF,
-    FAST,
     PERFORMANCE,
     QUALITY,
 }

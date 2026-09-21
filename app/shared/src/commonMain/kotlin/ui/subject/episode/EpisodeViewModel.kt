@@ -1129,7 +1129,6 @@ class EpisodeViewModel(
             videoEnhancement?.setMode(
                 when (defaultMode) {
                     VideoEnhancementDefaultMode.OFF -> VideoEnhancementMode.OFF
-                    VideoEnhancementDefaultMode.FAST -> VideoEnhancementMode.FAST
                     VideoEnhancementDefaultMode.PERFORMANCE -> VideoEnhancementMode.PERFORMANCE
                     VideoEnhancementDefaultMode.QUALITY -> VideoEnhancementMode.QUALITY
                 },

@@ -25,18 +25,16 @@ class VideoScaffoldConfigTest {
 
     @Test
     fun `video enhancement default survives serialization`() {
-        for (mode in listOf(VideoEnhancementDefaultMode.FAST, VideoEnhancementDefaultMode.QUALITY, VideoEnhancementDefaultMode.PERFORMANCE)) {
-            val config = VideoScaffoldConfig.Default.copy(
-                videoEnhancementDefaultMode = mode,
-            )
+        val config = VideoScaffoldConfig.Default.copy(
+            videoEnhancementDefaultMode = VideoEnhancementDefaultMode.QUALITY,
+        )
 
-            val decoded = DataStoreJson.decodeFromString(
-                VideoScaffoldConfig.serializer(),
-                DataStoreJson.encodeToString(VideoScaffoldConfig.serializer(), config),
-            )
+        val decoded = DataStoreJson.decodeFromString(
+            VideoScaffoldConfig.serializer(),
+            DataStoreJson.encodeToString(VideoScaffoldConfig.serializer(), config),
+        )
 
-            assertEquals(mode, decoded.videoEnhancementDefaultMode)
-        }
+        assertEquals(VideoEnhancementDefaultMode.QUALITY, decoded.videoEnhancementDefaultMode)
     }
 
     @Test

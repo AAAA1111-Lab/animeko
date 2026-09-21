@@ -20,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import me.him188.ani.app.ui.lang.Lang
-import me.him188.ani.app.ui.lang.video_player_fast
 import me.him188.ani.app.ui.lang.video_player_off
 import me.him188.ani.app.ui.lang.video_player_performance
 import me.him188.ani.app.ui.lang.video_player_quality
@@ -37,9 +36,8 @@ fun VideoEnhancementDropdown(
 ) {
     val mode by videoEnhancement.mode.collectAsState()
     val title = stringResource(Lang.video_player_video_enhancement)
-    val qualityText = stringResource(Lang.video_player_quality)
     val performanceText = stringResource(Lang.video_player_performance)
-    val fastText = stringResource(Lang.video_player_fast)
+    val qualityText = stringResource(Lang.video_player_quality)
     val offText = stringResource(Lang.video_player_off)
 
     DropdownMenu(
@@ -52,9 +50,8 @@ fun VideoEnhancementDropdown(
             style = MaterialTheme.typography.titleSmall,
         )
         listOf(
-            VideoEnhancementMode.QUALITY,
             VideoEnhancementMode.PERFORMANCE,
-            VideoEnhancementMode.FAST,
+            VideoEnhancementMode.QUALITY,
             VideoEnhancementMode.OFF,
         ).forEach { item ->
             DropdownMenuItem(
@@ -62,7 +59,6 @@ fun VideoEnhancementDropdown(
                     Text(
                         when (item) {
                             VideoEnhancementMode.OFF -> offText
-                            VideoEnhancementMode.FAST -> fastText
                             VideoEnhancementMode.PERFORMANCE -> performanceText
                             VideoEnhancementMode.QUALITY -> qualityText
                         },

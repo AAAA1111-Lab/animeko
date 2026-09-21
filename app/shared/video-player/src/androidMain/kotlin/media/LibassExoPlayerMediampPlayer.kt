@@ -57,6 +57,20 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.milliseconds
 
+/*
+ * ============================================================================================
+ * HOT_FIXES（播放器时间线回退后按需保留的修复，非视频增强特性的一部分）
+ * ============================================================================================
+ * 本文件已回退到 f2915c6（见该提交及其后提交记录），因此不含"轻量锐化 / CAS"相关改动。
+ * 但 f2915c6 之后另有三个与增强无关的播放器修复，回退会把它们一并丢掉，故在此单独保留。
+ * 每一处都带有 `HOT_FIX` 标记，便于将来单独摘除或上游化：
+ *
+ *   HOT_FIX-1  `patchProperties` 中的主线程约束（本文件约 150 行处）
+ *   HOT_FIX-2  HTTP 跨协议重定向 `setAllowCrossProtocolRedirects(true)`（约 225 行处）
+ *   HOT_FIX-3  MKV 的 `APPLICATION_MATROSKA` MIME 判定（约 260 行处）
+ * ============================================================================================
+ */
+
 /**
  * Adds libass parsing and rendering to MediaMP's ExoPlayer backend.
  *
@@ -148,6 +162,7 @@ class LibassExoPlayerMediampPlayer private constructor(
         private fun patchProperties(props: MediaProperties?): MediaProperties? {
             if (props == null) return null
             if (props.videoWidth != null && props.videoHeight != null) return props
+            // HOT_FIX-1: ExoPlayer 的视频尺寸查询必须在主线程调用，否则非主线程的调用方会崩。
             val displaySize = if (Looper.myLooper() == Looper.getMainLooper()) {
                 exoPlayer.videoDisplaySizeOrNull()
             } else {
@@ -224,6 +239,7 @@ private class LibassMediaSourcePipeline(
                         .setUserAgent(data.headers["User-Agent"] ?: DEFAULT_USER_AGENT)
                         .setDefaultRequestProperties(data.headers)
                         .setConnectTimeoutMs(CONNECT_TIMEOUT_MILLIS)
+                        // HOT_FIX-2: 允许 http -> https 之类的跨协议重定向，否则这类源无法播放。
                         .setAllowCrossProtocolRedirects(true)
                 } else {
                     // Non-HTTP URIs (content:// from local imports, file://, etc.) are served by
@@ -257,6 +273,7 @@ private class LibassMediaSourcePipeline(
 
         val mediaItem = MediaItem.Builder()
             .setUri(data.playbackUri)
+            // HOT_FIX-3: 明确标注 MKV，避免在缺少容器信息时按错误类型解析。
             .apply {
                 val uriStr = data.playbackUri.lowercase()
                 if (uriStr.contains(".mkv") || uriStr.contains("container=mkv") || uriStr.contains("format=mkv")) {
