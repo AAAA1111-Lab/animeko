@@ -86,3 +86,6 @@ private fun Format.describeForProbe(): String = buildString {
 
 private fun ByteArray.toHex(): String =
     take(8).joinToString(" ") { byte -> String.format(Locale.ROOT, "%02X", byte.toInt() and 0xFF) }
+
+private fun List<Byte>.toHex(): String =
+    joinToString(" ") { byte -> String.format(Locale.ROOT, "%02X", byte.toInt() and 0xFF) }
