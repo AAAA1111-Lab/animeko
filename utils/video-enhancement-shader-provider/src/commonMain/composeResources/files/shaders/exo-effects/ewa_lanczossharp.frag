@@ -44,20 +44,9 @@ vec3 inverseSigmoid(vec3 value) {
 	return vec3(SIGMOID_CENTER) - log(1.0 / mapped - 1.0) / SIGMOID_SLOPE;
 }
 
-vec3 sampleRaw(vec2 pixel) {
+vec3 sampleSigmoid(vec2 pixel) {
 	vec2 uv = (pixel + 0.5) / uInputSize;
-	return texture2D(uTexSampler, uv).rgb;
-}
-
-// sigmoid(v) = (logistic(v) - low) / (high - low) is an *affine* function of logistic(v), and the
-// normalisation by weightSum in main() is the matching affine average, so applying it to the
-// weighted average of the samples is identical to applying it per sample and averaging - while
-// saving three exp() calls for every contributing sample.
-vec3 applySigmoid(vec3 value) {
-	vec3 low = 1.0 / (1.0 + exp(vec3(SIGMOID_SLOPE * SIGMOID_CENTER)));
-	vec3 high = 1.0 / (1.0 + exp(vec3(SIGMOID_SLOPE * (SIGMOID_CENTER - 1.0))));
-	vec3 mapped = 1.0 / (1.0 + exp(SIGMOID_SLOPE * (vec3(SIGMOID_CENTER) - value)));
-	return (mapped - low) / (high - low);
+	return sigmoid(texture2D(uTexSampler, uv).rgb);
 }
 
 void main() {
@@ -76,17 +65,17 @@ void main() {
 			float distanceSquared = dot(delta, delta);
 			if (distanceSquared < EWA_RADIUS_SQUARED) {
 				float weight = ewaLanczosSharpWeight(distanceSquared);
-				accumulated += sampleRaw(base + offset) * weight;
+				accumulated += sampleSigmoid(base + offset) * weight;
 				weightSum += weight;
 			}
 		}
 	}
 
-	vec3 filtered = applySigmoid(accumulated / max(weightSum, 0.00001));
-	vec3 sample00 = applySigmoid(sampleRaw(base));
-	vec3 sample10 = applySigmoid(sampleRaw(base + vec2(1.0, 0.0)));
-	vec3 sample01 = applySigmoid(sampleRaw(base + vec2(0.0, 1.0)));
-	vec3 sample11 = applySigmoid(sampleRaw(base + vec2(1.0, 1.0)));
+	vec3 filtered = accumulated / max(weightSum, 0.00001);
+	vec3 sample00 = sampleSigmoid(base);
+	vec3 sample10 = sampleSigmoid(base + vec2(1.0, 0.0));
+	vec3 sample01 = sampleSigmoid(base + vec2(0.0, 1.0));
+	vec3 sample11 = sampleSigmoid(base + vec2(1.0, 1.0));
 	vec3 localMin = min(min(sample00, sample10), min(sample01, sample11));
 	vec3 localMax = max(max(sample00, sample10), max(sample01, sample11));
 	filtered = mix(filtered, clamp(filtered, localMin, localMax), ANTI_RINGING);
