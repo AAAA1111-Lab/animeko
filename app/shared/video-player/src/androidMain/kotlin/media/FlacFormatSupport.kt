@@ -22,6 +22,8 @@ import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.PositionHolder
 import androidx.media3.extractor.SeekMap
 import androidx.media3.extractor.TrackOutput
+import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.warn
 
 private const val FLAC_MARKER = "fLaC"
 private const val FLAC_STREAM_INFO_SIZE = 34
@@ -50,6 +52,11 @@ internal fun Format.withNormalizedFlacCodecSpecificData(): Format {
     val codecSpecificData = initializationData.firstOrNull() ?: return this
     if (codecSpecificData.startsWithFlacMarker()) return this
     if (codecSpecificData.size != FLAC_STREAM_INFO_SIZE) return this
+    if (ENABLE_AUDIO_FORMAT_PROBE) {
+        flacNormalizationLogger.warn {
+            "flac csd was a bare ${codecSpecificData.size}B STREAMINFO, prefixed the fLaC header"
+        }
+    }
     val normalized = ByteArray(FLAC_HEADER_SIZE + FLAC_STREAM_INFO_SIZE)
     flacHeader.copyInto(normalized)
     codecSpecificData.copyInto(normalized, FLAC_HEADER_SIZE)
@@ -57,6 +64,8 @@ internal fun Format.withNormalizedFlacCodecSpecificData(): Format {
         .setInitializationData(listOf(normalized))
         .build()
 }
+
+private val flacNormalizationLogger = logger("FlacFormatSupport")
 
 private fun ByteArray.startsWithFlacMarker(): Boolean =
     size >= FLAC_MARKER.length && FLAC_MARKER.indices.all { this[it] == FLAC_MARKER[it].code.toByte() }

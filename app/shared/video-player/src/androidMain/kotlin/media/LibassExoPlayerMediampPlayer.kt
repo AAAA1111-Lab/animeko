@@ -109,6 +109,10 @@ class LibassExoPlayerMediampPlayer private constructor(
     private var closed = false
 
     init {
+        if (ENABLE_AUDIO_FORMAT_PROBE) {
+            // 临时诊断: 把音频渲染器收到的格式写进 app.log, 用于定位 API 26 的 FLAC 播放失败。
+            exoPlayer.addAnalyticsListener(AudioFormatProbe())
+        }
         assHandler.init(exoPlayer)
         backgroundScope.launch(Dispatchers.Main.immediate) {
             while (isActive) {
