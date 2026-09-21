@@ -123,6 +123,8 @@ class LibassExoPlayerMediampPlayer private constructor(
     private var closed = false
 
     init {
+        // 临时诊断: 列出可用的 audio/flac 解码器 (只写日志). 见 AudioCodecProbe.
+        AudioCodecProbe.logFlacDecodersOnce()
         assHandler.init(exoPlayer)
         backgroundScope.launch(Dispatchers.Main.immediate) {
             while (isActive) {
