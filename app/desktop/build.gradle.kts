@@ -115,8 +115,9 @@ compose.desktop {
         if (getOs() == Os.MacOS) {
             jvmArgs(
                 // Compose 1.11.1 can crash while synchronizing its macOS accessibility tree.
-                // Remove this workaround after MediaMP is compatible with Compose 1.12+, which
-                // includes the upstream fix: https://github.com/JetBrains/compose-multiplatform-core/commit/81c2b3c283afae15b642f39dc8f8a1859041a755
+                // Compose 1.12.0 should contain the upstream fix, but that has not been verified
+                // on a real macOS build yet, so the workaround stays until it is confirmed.
+                // Upstream fix: https://github.com/JetBrains/compose-multiplatform-core/commit/81c2b3c283afae15b642f39dc8f8a1859041a755
                 "-Dcompose.accessibility.enable=false",
                 "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED",
                 "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
