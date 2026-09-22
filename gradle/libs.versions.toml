@@ -104,10 +104,13 @@ onnxruntime = "1.22.0"
 openapi-generator = "7.13.0"
 mediamp-upstream = "0.5.0"
 # AAAA1111-Lab/mediamp 的 fork 构建, 发布到 GitHub Packages.
-# 目前只用于 mediamp-exoplayer: fork 里加了可注入 MediaCodecSelector 的 hook, 上游还没有该参数.
+# 目前只用于 mediamp-exoplayer, fork 里有两处上游没有的改动:
+#   1. 可注入的 MediaCodecSelector hook;
+#   2. Android 上自带 FLAC 软件解码器 (dr_flac + SimpleDecoder), 解决本机只有硬解
+#      OMX.qti.audio.decoder.flac 且无法解 24-bit FLAC 的问题.
 # 其余 mediamp 模块仍用上游版本; 以后要让更多模块用 fork 时记得一起改.
-# 发布脚本见 fork 的 .github/workflows/publish-fork.yml.
-mediamp-fork = "0.5.0-fork1"
+# 发布脚本见 fork 的 .github/workflows/publish-fork.yml, 改完 fork 需重新发布并提升此版本号.
+mediamp-fork = "0.5.0-fork2"
 libass-android = "0.5.0-beta01"
 compose-native-tray = "1.3.0"
 kmpalette = "4.0.0-beta02"
