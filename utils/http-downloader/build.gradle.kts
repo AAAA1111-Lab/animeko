@@ -21,7 +21,10 @@ val mediampFfmpegAppleRuntimePath = configurations.resolvable("mediampFfmpegAppl
     isTransitive = false
 }
 
-val mediampVersion = libs.versions.mediamp.get()
+// 这里需要的是上游 mediamp-ffmpeg 的 ios runtime 版本, 与 libs.mediamp.ffmpeg.runtime.ios.xcframework
+// 保持一致. 生成的 libs.versions.* 访问器对这个别名不可用(与 catalog 内部的 get(name) 撞名),
+// 而 libs 暴露的是生成的 LibrariesForLibs, 拿不到 VersionCatalog.findVersion, 故直接写字面量.
+val mediampVersion = "0.5.0"
 val mediampFfmpegIOSRuntime = libs.mediamp.ffmpeg.runtime.ios.xcframework.get()
 
 val mediampFfmpegAppleRuntimeDirectory = layout.buildDirectory.dir("mediamp-ffmpeg/apple-runtime")

@@ -102,7 +102,12 @@ posthog-android = "3.11.3"
 posthog-java = "1.2.0"
 onnxruntime = "1.22.0"
 openapi-generator = "7.13.0"
-mediamp = "0.5.0"
+mediamp-upstream = "0.5.0"
+# AAAA1111-Lab/mediamp 的 fork 构建, 发布到 GitHub Packages.
+# 目前只用于 mediamp-exoplayer: fork 里加了可注入 MediaCodecSelector 的 hook, 上游还没有该参数.
+# 其余 mediamp 模块仍用上游版本; 以后要让更多模块用 fork 时记得一起改.
+# 发布脚本见 fork 的 .github/workflows/publish-fork.yml.
+mediamp-fork = "0.5.0-fork1"
 libass-android = "0.5.0-beta01"
 compose-native-tray = "1.3.0"
 kmpalette = "4.0.0-beta02"
@@ -301,26 +306,26 @@ androidx-media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-da
 androidx-media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", version.ref = "androidx-media3" }
 
 # mediamp
-mediamp-api = { module = "org.openani.mediamp:mediamp-api", version.ref = "mediamp" }
-mediamp-avkit = { module = "org.openani.mediamp:mediamp-avkit", version.ref = "mediamp" }
-mediamp-exoplayer = { module = "org.openani.mediamp:mediamp-exoplayer", version.ref = "mediamp" }
-mediamp-ffmpeg = { module = "org.openani.mediamp:mediamp-ffmpeg", version.ref = "mediamp" }
-mediamp-ffmpeg-desktop = { module = "org.openani.mediamp:mediamp-ffmpeg-desktop", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-windows-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-x64", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-windows-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-arm64", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-linux-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-linux-x64", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-macos-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-x64", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-arm64", version.ref = "mediamp" }
-mediamp-ffmpeg-runtime-ios-xcframework = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-ios-xcframework", version.ref = "mediamp" }
+mediamp-api = { module = "org.openani.mediamp:mediamp-api", version.ref = "mediamp-upstream" }
+mediamp-avkit = { module = "org.openani.mediamp:mediamp-avkit", version.ref = "mediamp-upstream" }
+mediamp-exoplayer = { module = "org.openani.mediamp:mediamp-exoplayer", version.ref = "mediamp-fork" }
+mediamp-ffmpeg = { module = "org.openani.mediamp:mediamp-ffmpeg", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-desktop = { module = "org.openani.mediamp:mediamp-ffmpeg-desktop", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-windows-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-x64", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-windows-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-arm64", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-linux-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-linux-x64", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-macos-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-x64", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-arm64", version.ref = "mediamp-upstream" }
+mediamp-ffmpeg-runtime-ios-xcframework = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-ios-xcframework", version.ref = "mediamp-upstream" }
 # Apple runtime is published as a @zip XCFramework and is resolved explicitly where needed.
-mediamp-mpv = { module = "org.openani.mediamp:mediamp-mpv", version.ref = "mediamp" }
-mediamp-mpv-runtime-windows-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-windows-x64", version.ref = "mediamp" }
-mediamp-mpv-runtime-windows-arm64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-windows-arm64", version.ref = "mediamp" }
-mediamp-mpv-runtime-linux-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-linux-x64", version.ref = "mediamp" }
-mediamp-mpv-runtime-macos-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-macos-x64", version.ref = "mediamp" }
-mediamp-mpv-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-macos-arm64", version.ref = "mediamp" }
-mediamp-source-ktxio = { module = "org.openani.mediamp:mediamp-source-ktxio", version.ref = "mediamp" }
-mediamp-test = { module = "org.openani.mediamp:mediamp-test", version.ref = "mediamp" }
+mediamp-mpv = { module = "org.openani.mediamp:mediamp-mpv", version.ref = "mediamp-upstream" }
+mediamp-mpv-runtime-windows-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-windows-x64", version.ref = "mediamp-upstream" }
+mediamp-mpv-runtime-windows-arm64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-windows-arm64", version.ref = "mediamp-upstream" }
+mediamp-mpv-runtime-linux-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-linux-x64", version.ref = "mediamp-upstream" }
+mediamp-mpv-runtime-macos-x64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-macos-x64", version.ref = "mediamp-upstream" }
+mediamp-mpv-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-mpv-runtime-macos-arm64", version.ref = "mediamp-upstream" }
+mediamp-source-ktxio = { module = "org.openani.mediamp:mediamp-source-ktxio", version.ref = "mediamp-upstream" }
+mediamp-test = { module = "org.openani.mediamp:mediamp-test", version.ref = "mediamp-upstream" }
 libass-media = { module = "io.github.peerless2012:ass-media", version.ref = "libass-android" }
 
 ### All other libraries ###

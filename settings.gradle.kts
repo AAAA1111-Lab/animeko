@@ -175,6 +175,33 @@ val localProperties: Provider<Properties> =
 
 fun findLocalProperty(key: String): String? = localProperties.orNull?.getProperty(key)
 
+// settings 里拿不到 build-logic 的 helpers, 这里按 local.properties -> 环境变量 的顺序读.
+fun findLocalPropertyOrEnv(key: String): String? =
+    findLocalProperty(key) ?: System.getenv(key)
+
+// 仅当提供了凭据时才加 GitHub Packages: 否则匿名请求会拿到 401, 反而让所有依赖解析失败.
+// 凭据来源: local.properties(githubPackagesUsername/Password) 或同名环境变量.
+findLocalPropertyOrEnv("githubPackagesUrl")?.let { url ->
+    val username = findLocalPropertyOrEnv("githubPackagesUsername")
+    val password = findLocalPropertyOrEnv("githubPackagesPassword")
+    if (username != null && password != null) {
+        println("i:: Adding GitHub Packages repository: $url")
+        dependencyResolutionManagement.repositories.maven {
+            name = "GitHubPackages"
+            setUrl(url)
+            credentials {
+                this.username = username
+                this.password = password
+            }
+            content {
+                includeGroup("org.openani.mediamp")
+            }
+        }
+    } else {
+        println("w:: githubPackagesUrl is set but no credentials; skipping GitHub Packages repository")
+    }
+}
+
 findLocalProperty("ani.build.mediamp.path")?.let { mediampPath ->
     println("i:: Including mediamp as a Composite Build from: $mediampPath")
     includeBuild(mediampPath) {
