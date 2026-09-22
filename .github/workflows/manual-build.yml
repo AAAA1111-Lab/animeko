@@ -87,6 +87,19 @@ jobs:
         with:
           cache-disabled: false
 
+      # mediamp-exoplayer 来自 AAAA1111-Lab/mediamp 的 fork, 发布在该 fork 的 GitHub Packages.
+      # 跨仓库读取需要 PAT(classic, 勾 read:packages); 默认的 GITHUB_TOKEN 只能读本仓库的包.
+      # 未配置该 secret 时这里的密码为空, 依赖解析会因为找不到 0.5.0-fork1 而失败 —— 预期行为.
+      - name: Configure GitHub Packages credentials
+        env:
+          MEDIAMP_FORK_PACKAGES_TOKEN: ${{ secrets.MEDIAMP_FORK_PACKAGES_TOKEN }}
+        run: |
+          {
+            echo "githubPackagesUrl=https://maven.pkg.github.com/AAAA1111-Lab/mediamp"
+            echo "githubPackagesUsername=AAAA1111-Lab"
+            echo "githubPackagesPassword=${MEDIAMP_FORK_PACKAGES_TOKEN}"
+          } >> local.properties
+
       - name: Build Android Release APK
         run: |
           chmod +x gradlew
