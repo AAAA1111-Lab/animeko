@@ -11,14 +11,15 @@ package me.him188.ani.app.ui.subject.episode.details.components
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import me.him188.ani.app.ui.foundation.widgets.SelectableDropdownMenuItem
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.video_player_fast
 import me.him188.ani.app.ui.lang.video_player_off
@@ -46,9 +47,11 @@ fun VideoEnhancementDropdown(
         expanded = showDropdown,
         onDismissRequest = onDismissRequest,
     ) {
+        // Shares the menu items' content padding so the heading lines up with their labels; a
+        // separate horizontal padding would indent it relative to every item below it.
         Text(
             title,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(MenuDefaults.DropdownMenuItemContentPadding),
             style = MaterialTheme.typography.titleSmall,
         )
         listOf(
@@ -57,7 +60,8 @@ fun VideoEnhancementDropdown(
             VideoEnhancementMode.FAST,
             VideoEnhancementMode.OFF,
         ).forEach { item ->
-            DropdownMenuItem(
+            SelectableDropdownMenuItem(
+                selected = item == mode,
                 text = {
                     Text(
                         when (item) {
@@ -72,7 +76,6 @@ fun VideoEnhancementDropdown(
                     videoEnhancement.setMode(item)
                     onDismissRequest()
                 },
-                enabled = item != mode,
             )
         }
     }
