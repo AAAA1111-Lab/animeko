@@ -154,8 +154,14 @@ class EpisodeDanmakuLoader(
     private val latestFetchResults = MutableStateFlow<List<DanmakuFetchResult>?>(null)
 
     // this flow must emit a value quickly when started, otherwise it will block ui
+    //
+    // [onStart] is load-bearing, not a nicety: this flow feeds the many-way `combine` behind
+    // EpisodeViewModel.pageState, and a `combine` emits nothing until every source has emitted at
+    // least once. Without the immediate emission pageState stays null and EpisodePage renders its
+    // empty branch — a blank screen. Do not remove it.
     val fetchResults: Flow<List<DanmakuFetchResultWithConfig>> = danmakuLoader.fetchResultFlow
         .onEach { latestFetchResults.value = it }
+        .onStart { emit(null) }
         .combine(configFlow) { results, configs ->
             results.orEmpty().map {
                 DanmakuFetchResultWithConfig(
