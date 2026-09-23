@@ -1362,6 +1362,8 @@
     <string name="cache_danmaku_all_action">Cache all danmaku</string>
     <string name="cache_danmaku_all_progress">%1$d/%2$d</string>
     <string name="cache_danmaku_all_done">Cached danmaku for %1$d episodes</string>
+    <string name="cache_danmaku_all_complete">All danmaku cached</string>
+    <string name="cache_danmaku_episode_cached">Danmaku %1$d</string>
     <string name="subject_episode_collapse">Collapse</string>
     <string name="subject_episode_expand">Expand</string>
     <string name="subject_episode_more_options">More options</string>

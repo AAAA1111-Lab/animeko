@@ -41,6 +41,8 @@ import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
 import me.him188.ani.app.data.repository.subject.SubjectRelationsRepository
 import me.him188.ani.app.data.repository.user.SettingsRepository
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheState
 import me.him188.ani.app.domain.danmaku.DanmakuRepository
 import me.him188.ani.app.domain.episode.EpisodeCompletionContext.isKnownCompleted
 import me.him188.ani.app.domain.media.cache.DeleteCacheByCacheIdUseCase
@@ -124,31 +126,23 @@ interface SubjectCacheViewModel {
     suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int
 
     /**
-     * 批量缓存该条目弹幕的进度.
+     * 批量缓存该条目弹幕的进度. 由应用级 [DanmakuBatchCacheManager] 持有, 离开页面后仍然保留.
      */
-    val danmakuCacheStateFlow: StateFlow<DanmakuCacheBatchState>
+    val danmakuCacheStateFlow: StateFlow<DanmakuBatchCacheState>
 
     /**
-     * 缓存该条目全部剧集的弹幕.
+     * 每集已缓存的弹幕条数. 没有缓存的剧集不在其中.
+     */
+    val danmakuCountsFlow: StateFlow<Map<Int, Int>>
+
+    /**
+     * 缓存该条目中**尚未缓存**弹幕的剧集.
      *
      * 与媒体缓存的自动弹幕缓存不同, 这是用户主动要求的动作, 因此不检查
      * [me.him188.ani.app.data.models.preference.DanmakuCacheStrategy].
      */
     fun cacheAllDanmaku()
 }
-
-/**
- * 条目级"缓存全部弹幕"的进度.
- */
-data class DanmakuCacheBatchState(
-    val isRunning: Boolean = false,
-    /** 已处理的剧集数. */
-    val done: Int = 0,
-    /** 本次要处理的剧集总数. */
-    val total: Int = 0,
-    /** 实际写入弹幕的剧集数, 用于结果提示. */
-    val succeeded: Int = 0,
-)
 
 @Stable
 class SubjectCacheViewModelImpl(
@@ -162,6 +156,7 @@ class SubjectCacheViewModelImpl(
     private val episodePreferencesRepository: EpisodePreferencesRepository by inject()
     private val subjectRelationsRepository: SubjectRelationsRepository by inject()
     private val danmakuRepository: DanmakuRepository by inject()
+    private val danmakuBatchCacheManager: DanmakuBatchCacheManager by inject()
     private val deleteCacheByEpisodeIdUseCase: DeleteCacheByEpisodeIdUseCase by inject()
     private val deleteCacheByCacheIdUseCase: DeleteCacheByCacheIdUseCase by inject()
     private val episodePlayHistoryRepository: EpisodePlayHistoryRepository by inject()
@@ -360,63 +355,17 @@ class SubjectCacheViewModelImpl(
     override val allEpisodesFlow: Flow<List<EpisodeInfo>> =
         episodeCollectionsFlow.map { list -> list.map { it.episodeInfo } }
 
-    override val danmakuCacheStateFlow: MutableStateFlow<DanmakuCacheBatchState> =
-        MutableStateFlow(DanmakuCacheBatchState())
+    // 状态与执行都交给应用级单例: 离开页面后 SubjectCacheViewModel 的 backgroundScope 会被取消,
+    // 放在这里会让"退出页面仍在后台跑"无法实现, 也看不到上一次的进度.
+    override val danmakuCacheStateFlow: StateFlow<DanmakuBatchCacheState> =
+        danmakuBatchCacheManager.stateFlow(subjectId)
+
+    override val danmakuCountsFlow: StateFlow<Map<Int, Int>> =
+        danmakuRepository.cachedDanmakuCountsFlow(subjectId)
+            .stateInBackground(emptyMap())
 
     override fun cacheAllDanmaku() {
-        if (danmakuCacheStateFlow.value.isRunning) return
-        launchInBackground {
-            val episodes = episodesFlow.first()
-            if (episodes.isEmpty()) return@launchInBackground
-
-            val subjectInfo = subjectInfoFlow.first().subjectInfo
-            danmakuCacheStateFlow.value = DanmakuCacheBatchState(
-                isRunning = true,
-                total = episodes.size,
-            )
-            var succeeded = 0
-            try {
-                for (episode in episodes) {
-                    val episodeInfo = episodeCollectionsFlow.first()
-                        .firstOrNull { it.episodeId == episode.episodeId }
-                        ?.episodeInfo
-                    if (episodeInfo == null) {
-                        danmakuCacheStateFlow.update { it.copy(done = it.done + 1) }
-                        continue
-                    }
-                    // One unreachable source must not abandon the remaining episodes, so failures
-                    // are counted as "not cached" rather than thrown.
-                    //
-                    // No filename or media is known here — this runs from the cache page, not from
-                    // playback — so providers fall back to matching by episode id / sort. That is
-                    // still an exact match for the Ani source and for dandanplay's episode lookup.
-                    val count = runCatching {
-                        danmakuRepository.fetchAndCacheNow(
-                            DanmakuFetchRequest(
-                                subjectId = subjectInfo.subjectId,
-                                subjectPrimaryName = subjectInfo.displayName,
-                                subjectNames = subjectInfo.allNames,
-                                subjectPublishDate = subjectInfo.airDate,
-                                episodeId = episodeInfo.episodeId,
-                                episodeSort = episodeInfo.sort,
-                                episodeEp = episodeInfo.ep,
-                                episodeName = episodeInfo.displayName,
-                                filename = null,
-                                fileHash = null,
-                                fileSize = null,
-                                videoDuration = Duration.ZERO,
-                            ),
-                        )
-                    }.onFailure {
-                        logger.warn("cacheAllDanmaku: episode ${episodeInfo.episodeId} failed", it)
-                    }.getOrDefault(0)
-                    if (count > 0) succeeded++
-                    danmakuCacheStateFlow.update { it.copy(done = it.done + 1) }
-                }
-            } finally {
-                danmakuCacheStateFlow.update { it.copy(isRunning = false, succeeded = succeeded) }
-            }
-        }
+        danmakuBatchCacheManager.cacheAll(subjectId)
     }
 
     override suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int {

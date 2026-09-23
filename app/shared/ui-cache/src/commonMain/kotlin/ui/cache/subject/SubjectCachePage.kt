@@ -98,9 +98,12 @@ import me.him188.ani.app.ui.foundation.theme.AniThemeDefaults
 import me.him188.ani.app.ui.foundation.theme.appChromeHazeSource
 import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheState
 import me.him188.ani.app.ui.lang.cache_danmaku_all_action
+import me.him188.ani.app.ui.lang.cache_danmaku_all_complete
 import me.him188.ani.app.ui.lang.cache_danmaku_all_done
 import me.him188.ani.app.ui.lang.cache_danmaku_all_progress
+import me.him188.ani.app.ui.lang.cache_danmaku_episode_cached
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
 import me.him188.ani.app.ui.lang.cache_filter_collection_dropped
 import me.him188.ani.app.ui.lang.cache_import_already_imported
@@ -132,6 +135,9 @@ object SubjectCachePageTestTags {
     const val SUMMARY_ROW = "subject_cache_summary_row"
     const val PAUSE_ALL = "subject_cache_pause_all"
     const val RESUME_ALL = "subject_cache_resume_all"
+
+    /** 剧集行上的"弹幕 N"标记, 供 UI 测试断言每集的弹幕缓存状态. */
+    const val DANMAKU_CACHED_BADGE = "subject_cache_danmaku_cached_badge"
 }
 
 /**
@@ -179,18 +185,21 @@ fun SubjectCacheScreen(
     val cachedEpisodes by vm.cacheEpisodesFlow.collectAsStateWithLifecycle()
     val allEpisodes by vm.allEpisodesFlow.collectAsStateWithLifecycle(emptyList())
     val danmakuCacheState by vm.danmakuCacheStateFlow.collectAsStateWithLifecycle()
+    val danmakuCounts by vm.danmakuCountsFlow.collectAsStateWithLifecycle()
     val toaster = LocalToaster.current
     val danmakuCacheDoneTemplate = stringResource(Lang.cache_danmaku_all_done)
 
-    // 批量缓存完成时提示结果. 只在"运行中 -> 结束"的这一次触发, 否则进入页面就会弹一次旧结果.
-    var wasCachingDanmaku by remember { mutableStateOf(false) }
-    LaunchedEffect(danmakuCacheState.isRunning, danmakuCacheState.succeeded) {
-        if (wasCachingDanmaku && !danmakuCacheState.isRunning && danmakuCacheState.succeeded > 0) {
-            toaster.show(
-                danmakuCacheDoneTemplate.replace("%1\$d", danmakuCacheState.succeeded.toString()),
-            )
+    // 批量缓存跑完就提示, 包括"点的时候其实已经全缓存过了"这种空操作.
+    // 用 completionCount 而不是 isRunning 的边沿: 页面重建后 isRunning 的边沿会丢事件.
+    var seenDanmakuCompletion by remember { mutableStateOf(danmakuCacheState.completionCount) }
+    LaunchedEffect(danmakuCacheState.completionCount) {
+        val completion = danmakuCacheState.completionCount
+        if (completion != seenDanmakuCompletion) {
+            seenDanmakuCompletion = completion
+            danmakuCacheState.lastResult?.let { result ->
+                toaster.show(danmakuCacheDoneTemplate.replace("%1\$d", result.succeeded.toString()))
+            }
         }
-        wasCachingDanmaku = danmakuCacheState.isRunning
     }
 
     SubjectCachePage(
@@ -210,6 +219,8 @@ fun SubjectCacheScreen(
         onImportLocalFiles = { vm.importLocalFiles(it) },
         danmakuCacheState = danmakuCacheState,
         onCacheAllDanmaku = { vm.cacheAllDanmaku() },
+        missingDanmakuEpisodeCount = allEpisodes.count { (danmakuCounts[it.episodeId] ?: 0) <= 0 },
+        danmakuCounts = danmakuCounts,
         modifier = modifier,
         windowInsets = windowInsets,
         navigationIcon = navigationIcon,
@@ -237,8 +248,10 @@ fun SubjectCachePage(
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
     navigationIcon: @Composable () -> Unit = {},
     allEpisodes: List<EpisodeInfo> = emptyList(),
-    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    danmakuCacheState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
     onCacheAllDanmaku: (() -> Unit)? = null,
+    missingDanmakuEpisodeCount: Int = 0,
+    danmakuCounts: Map<Int, Int> = emptyMap(),
     onImportLocalFiles: (suspend (List<LocalImportFileItem>) -> Int)? = null,
 ) {
     val selectionState = rememberCacheSelectionState()
@@ -461,6 +474,7 @@ fun SubjectCachePage(
                 modifier = Modifier.fillMaxWidth(),
                 danmakuCacheState = danmakuCacheState,
                 onCacheAllDanmaku = onCacheAllDanmaku,
+                missingDanmakuEpisodeCount = missingDanmakuEpisodeCount,
             )
 
             LazyVerticalGrid(
@@ -496,6 +510,7 @@ fun SubjectCachePage(
                     onPause = onPause,
                     onDelete = onDelete,
                     onViewDetail = onViewDetail,
+                    danmakuCounts = danmakuCounts,
                 )
             }
         }
@@ -522,6 +537,8 @@ fun LazyGridScope.subjectCacheEpisodeItems(
     onViewDetail: ((CacheEpisodeState) -> Unit)?,
     // 设计稿: 手机上行通栏无圆角, 宽屏详情栏内为圆角.
     rowShape: Shape = RectangleShape,
+    // 每集已缓存的弹幕条数, 用于在未缓存媒体的剧集上展示弹幕缓存状态.
+    danmakuCounts: Map<Int, Int> = emptyMap(),
 ) {
     val cachesByEpisodeId = cachedEpisodes.groupBy { it.episodeId }
     val consumedCacheIds = mutableSetOf<String>()
@@ -562,6 +579,7 @@ fun LazyGridScope.subjectCacheEpisodeItems(
                     inSelectionMode = selectionState.inSelection,
                     onClick = { onClickNotCached(episode) },
                     onCancel = { onCancelRequest(episode) },
+                    cachedDanmakuCount = danmakuCounts[episode.episodeId] ?: 0,
                 )
             }
         }
@@ -588,8 +606,9 @@ fun SubjectCacheSummaryRow(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
-    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    danmakuCacheState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
     onCacheAllDanmaku: (() -> Unit)? = null,
+    missingDanmakuEpisodeCount: Int = 0,
 ) {
     Row(
         modifier
@@ -614,7 +633,7 @@ fun SubjectCacheSummaryRow(
 
         if (!inSelection) {
             if (onCacheAllDanmaku != null) {
-                DanmakuCacheAllButton(danmakuCacheState, onCacheAllDanmaku)
+                DanmakuCacheAllButton(danmakuCacheState, missingDanmakuEpisodeCount, onCacheAllDanmaku)
             }
             PauseOrResumeAllTextButton(cachedEpisodes, onPauseAll, onResumeAll)
         }
@@ -707,6 +726,7 @@ fun EpisodeNotCachedRow(
     onClick: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    cachedDanmakuCount: Int = 0,
 ) {
     val info = episode.info
     Row(
@@ -732,6 +752,17 @@ fun EpisodeNotCachedRow(
                 UnifiedCollectionType.DONE -> WatchStatusChip(stringResource(Lang.cache_filter_collection_done))
                 UnifiedCollectionType.DROPPED -> WatchStatusChip(stringResource(Lang.cache_filter_collection_dropped))
                 else -> {}
+            }
+
+            // 媒体没缓存不代表弹幕没缓存, 没有这一行的话用户无法判断"缓存全部弹幕"到底做了哪些集.
+            if (cachedDanmakuCount > 0) {
+                Text(
+                    stringResource(Lang.cache_danmaku_episode_cached, cachedDanmakuCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.testTag(SubjectCachePageTestTags.DANMAKU_CACHED_BADGE),
+                )
             }
 
             // 设计稿: 追加缓存图标为 primary 色; 看过/未开播的行保持减淡的颜色.
@@ -773,22 +804,25 @@ fun SubjectCacheDetailPaneContent(
 ) {
     val cachedEpisodes by vm.cacheEpisodesFlow.collectAsStateWithLifecycle()
     val danmakuCacheState by vm.danmakuCacheStateFlow.collectAsStateWithLifecycle()
+    val danmakuCounts by vm.danmakuCountsFlow.collectAsStateWithLifecycle()
     val toaster = LocalToaster.current
     val danmakuCacheDoneTemplate = stringResource(Lang.cache_danmaku_all_done)
+    val missingDanmakuEpisodeCount = vm.cacheListState.episodes.count { (danmakuCounts[it.episodeId] ?: 0) <= 0 }
 
     var hideMediaSelector by remember(vm.cacheListState.currentSelectMediaTask) {
         mutableStateOf(false)
     }
 
-    // 批量缓存完成时提示结果. 只在"运行中 -> 结束"的那一次触发, 否则进入页面就会弹一次旧结果.
-    var wasCachingDanmaku by remember { mutableStateOf(false) }
-    LaunchedEffect(danmakuCacheState.isRunning, danmakuCacheState.succeeded) {
-        if (wasCachingDanmaku && !danmakuCacheState.isRunning && danmakuCacheState.succeeded > 0) {
-            toaster.show(
-                danmakuCacheDoneTemplate.replace("%1\$d", danmakuCacheState.succeeded.toString()),
-            )
+    // 与条目缓存页一致: 用 completionCount 判断"刚跑完一次", 页面重建后也不会丢事件.
+    var seenDanmakuCompletion by remember { mutableStateOf(danmakuCacheState.completionCount) }
+    LaunchedEffect(danmakuCacheState.completionCount) {
+        val completion = danmakuCacheState.completionCount
+        if (completion != seenDanmakuCompletion) {
+            seenDanmakuCompletion = completion
+            danmakuCacheState.lastResult?.let { result ->
+                toaster.show(danmakuCacheDoneTemplate.replace("%1\$d", result.succeeded.toString()))
+            }
         }
-        wasCachingDanmaku = danmakuCacheState.isRunning
     }
 
     EpisodeCacheRequesterDialogs(
@@ -823,6 +857,7 @@ fun SubjectCacheDetailPaneContent(
                     modifier = Modifier.fillMaxWidth(),
                     danmakuCacheState = danmakuCacheState,
                     onCacheAllDanmaku = { vm.cacheAllDanmaku() },
+                    missingDanmakuEpisodeCount = missingDanmakuEpisodeCount,
                 )
             } else {
                 SubjectCacheDetailHeader(
@@ -833,6 +868,7 @@ fun SubjectCacheDetailPaneContent(
                     onResumeAll = { vm.resumeAllCaches() },
                     danmakuCacheState = danmakuCacheState,
                     onCacheAllDanmaku = { vm.cacheAllDanmaku() },
+                    missingDanmakuEpisodeCount = missingDanmakuEpisodeCount,
                 )
             }
         }
@@ -859,6 +895,7 @@ fun SubjectCacheDetailPaneContent(
             onDelete = { vm.deleteCache(it) },
             onViewDetail = onViewDetail,
             rowShape = rowShape,
+            danmakuCounts = danmakuCounts,
         )
     }
 }
@@ -874,8 +911,9 @@ fun SubjectCacheDetailHeader(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
-    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    danmakuCacheState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
     onCacheAllDanmaku: (() -> Unit)? = null,
+    missingDanmakuEpisodeCount: Int = 0,
 ) {
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -903,23 +941,27 @@ fun SubjectCacheDetailHeader(
             )
         }
         if (onCacheAllDanmaku != null) {
-            DanmakuCacheAllButton(danmakuCacheState, onCacheAllDanmaku)
+            DanmakuCacheAllButton(danmakuCacheState, missingDanmakuEpisodeCount, onCacheAllDanmaku)
         }
         PauseOrResumeAllTextButton(cachedEpisodes, onPauseAll, onResumeAll)
     }
 }
 
 /**
- * "缓存全部弹幕" 入口. 批量缓存期间显示进度, 避免看起来没反应.
+ * "缓存全部弹幕" 入口.
+ *
+ * 三种状态: 运行中显示进度; 该条目每一集都已有弹幕时显示已完成且不可点 (否则点了看起来没反应);
+ * 其余情况可点, 只缓存缺失的剧集.
  */
 @Composable
 private fun DanmakuCacheAllButton(
-    state: DanmakuCacheBatchState,
+    state: DanmakuBatchCacheState,
+    missingEpisodeCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (state.isRunning) {
-        Row(
+    when {
+        state.isRunning -> Row(
             modifier.padding(start = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -932,8 +974,16 @@ private fun DanmakuCacheAllButton(
                 maxLines = 1,
             )
         }
-    } else {
-        TextButton(onClick = onClick, modifier = modifier.padding(start = 4.dp)) {
+
+        missingEpisodeCount == 0 -> Text(
+            stringResource(Lang.cache_danmaku_all_complete),
+            modifier.padding(start = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+
+        else -> TextButton(onClick = onClick, modifier = modifier.padding(start = 4.dp)) {
             Text(stringResource(Lang.cache_danmaku_all_action), maxLines = 1)
         }
     }

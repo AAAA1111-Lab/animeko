@@ -84,6 +84,7 @@ import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.PreferencesRepositoryImpl
 import me.him188.ani.app.data.repository.user.SettingsRepository
 import me.him188.ani.app.data.repository.user.TokenRepository
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
 import me.him188.ani.app.domain.danmaku.DanmakuRepository
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeature
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeatureHandler
@@ -452,6 +453,15 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
             getMediaCacheUseCase = get(),
             getSubjectEpisodeInfoBundleFlowUseCase = get(),
             settingsRepository = get(),
+        )
+    }
+    // 应用级单例: 批量缓存弹幕必须在离开条目缓存页后继续跑, 因此它的作用域不能是页面的 ViewModel.
+    single<DanmakuBatchCacheManager> {
+        DanmakuBatchCacheManager(
+            applicationScope = coroutineScope,
+            danmakuRepository = get(),
+            subjectCollectionRepository = get(),
+            episodeCollectionRepository = get(),
         )
     }
     single<UpdateManager> {

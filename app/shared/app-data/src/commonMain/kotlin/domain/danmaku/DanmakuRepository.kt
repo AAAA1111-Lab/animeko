@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -97,6 +98,14 @@ class DanmakuRepository(
      */
     fun cachedDanmakuCountFlow(subjectId: Int, episodeId: Int): Flow<Int> =
         danmakuDao.countBySubjectAndEpisode(subjectId, episodeId).distinctUntilChanged()
+
+    /**
+     * 条目下每一集已缓存的弹幕条数. 没有缓存的剧集不会出现在结果里.
+     */
+    fun cachedDanmakuCountsFlow(subjectId: Int): Flow<Map<Int, Int>> =
+        danmakuDao.episodeDanmakuCountsFlow(subjectId)
+            .map { rows -> rows.associate { it.episodeId to it.count } }
+            .distinctUntilChanged()
 
     /**
      * 清空全部弹幕缓存.

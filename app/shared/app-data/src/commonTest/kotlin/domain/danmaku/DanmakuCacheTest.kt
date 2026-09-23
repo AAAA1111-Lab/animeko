@@ -42,6 +42,7 @@ import me.him188.ani.app.data.models.subject.SubjectSeriesInfo
 import me.him188.ani.app.data.models.subject.TestSubjectCollections
 import me.him188.ani.app.data.persistent.database.dao.DanmakuDao
 import me.him188.ani.app.data.persistent.database.dao.DanmakuEntity
+import me.him188.ani.app.data.persistent.database.dao.EpisodeDanmakuCount
 import me.him188.ani.app.data.repository.user.Settings
 import me.him188.ani.app.data.repository.user.SettingsRepository
 import me.him188.ani.app.domain.episode.GetSubjectEpisodeInfoBundleFlowUseCase
@@ -288,6 +289,14 @@ class DanmakuCacheTest {
         override suspend fun deleteBySubjectAndEpisode(subjectId: Int, episodeId: Int) = Unit
         override suspend fun countAll(): Int = upsertCalls.sumOf { it.size }
         override fun countAllFlow(): Flow<Int> = MutableStateFlow(upsertCalls.sumOf { it.size })
+        override fun episodeDanmakuCountsFlow(subjectId: Int): Flow<List<EpisodeDanmakuCount>> =
+            MutableStateFlow(
+                upsertCalls.flatten()
+                    .filter { it.subjectId == subjectId }
+                    .groupBy { it.episodeId }
+                    .map { (episodeId, rows) -> EpisodeDanmakuCount(episodeId, rows.size) },
+            )
+
         override suspend fun deleteAll() {
             upsertCalls.clear()
         }
