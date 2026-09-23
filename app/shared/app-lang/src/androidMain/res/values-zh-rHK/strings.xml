@@ -1345,6 +1345,9 @@
     <string name="settings_storage_danmaku_cache_clear_confirm_title">清空彈幕快取？</string>
     <string name="settings_storage_danmaku_cache_clear_confirm_text">將刪除本機儲存的全部彈幕。下次播放時會重新從彈幕來源下載。</string>
     <string name="settings_storage_danmaku_cache_clear_done">已清空 %1$d 條彈幕</string>
+    <string name="cache_danmaku_all_action">快取全部彈幕</string>
+    <string name="cache_danmaku_all_progress">%1$d/%2$d</string>
+    <string name="cache_danmaku_all_done">已快取 %1$d 集的彈幕</string>
     <string name="subject_episode_collapse">收起</string>
     <string name="subject_episode_expand">展開</string>
     <string name="subject_episode_more_options">更多選項</string>
