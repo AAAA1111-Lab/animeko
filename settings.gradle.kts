@@ -179,8 +179,53 @@ fun findLocalProperty(key: String): String? = localProperties.orNull?.getPropert
 fun findLocalPropertyOrEnv(key: String): String? =
     findLocalProperty(key) ?: System.getenv(key)
 
-// 仅当提供了凭据时才加 GitHub Packages: 否则匿名请求会拿到 401, 反而让所有依赖解析失败.
-// 凭据来源: local.properties(githubPackagesUsername/Password) 或同名环境变量.
+// mediamp 来自仓库内的 submodule(thirdparty/mediamp,即 AAAA1111-Lab/mediamp 的 fork),
+// 以复合构建的方式从源码消费, 因此**不需要任何凭据**.
+//
+// 为什么不用包仓库: GitHub Packages 即使对 public 包也拒绝匿名下载(实测 pom/module/aar 全 401),
+// 于是每个消费端构建都要带一个迟早过期的 token. 从源码组合把凭据从整条链上拿掉了.
+//
+// 消费模式开关: 复合构建会配置 included build 的所有子项目, 而 fork 的 mediamp-ffmpeg 在配置期
+// 就要解析 MSYS2, 在 Windows 上会直接让整个构建失败(实测). 因此从 fork 侧用
+// -Dmediamp.consumer=true 只纳入可链接的库模块. 用系统属性而不是 Gradle 属性, 因为前者在
+// includeBuild 之前设置一定能被 included build 读到.
+//
+// 本地调试仍然可以用 local.properties 的 ani.build.mediamp.path 指向任意 fork 检出,
+// 此时会覆盖 submodule 的路径.
+val mediampOverridePath = findLocalProperty("ani.build.mediamp.path")
+val mediampCompositePath = mediampOverridePath ?: layout.settingsDirectory.dir("thirdparty/mediamp").asFile.path
+if (mediampOverridePath != null) {
+    println("i:: Including mediamp from the ani.build.mediamp.path override: $mediampOverridePath")
+} else if (file(mediampCompositePath).isDirectory) {
+    println("i:: Including mediamp from the bundled submodule: $mediampCompositePath")
+}
+
+if (mediampOverridePath != null || file(mediampCompositePath).isDirectory) {
+    val previousConsumerFlag = System.getProperty("mediamp.consumer")
+    System.setProperty("mediamp.consumer", "true")
+    includeBuild(mediampCompositePath) {
+        dependencySubstitution {
+            substitute(module("org.openani.mediamp:mediamp-api"))
+                .using(project(":mediamp-api"))
+            substitute(module("org.openani.mediamp:mediamp-exoplayer"))
+                .using(project(":mediamp-exoplayer"))
+            substitute(module("org.openani.mediamp:mediamp-test"))
+                .using(project(":mediamp-test"))
+            substitute(module("org.openani.mediamp:mediamp-source-ktxio"))
+                .using(project(":mediamp-source-ktxio"))
+            substitute(module("org.openani.mediamp:mediamp-internal-utils"))
+                .using(project(":mediamp-internal-utils"))
+        }
+    }
+    if (previousConsumerFlag == null) {
+        System.clearProperty("mediamp.consumer")
+    } else {
+        System.setProperty("mediamp.consumer", previousConsumerFlag)
+    }
+}
+
+// GitHub Packages 只作为兜底: 只有在显式提供了地址与凭据时才加, 否则匿名请求会拿到 401,
+// 反而让所有依赖解析失败. 正常路径(上面的复合构建)不需要它.
 findLocalPropertyOrEnv("githubPackagesUrl")?.let { url ->
     val username = findLocalPropertyOrEnv("githubPackagesUsername")
     val password = findLocalPropertyOrEnv("githubPackagesPassword")
@@ -199,28 +244,6 @@ findLocalPropertyOrEnv("githubPackagesUrl")?.let { url ->
         }
     } else {
         println("w:: githubPackagesUrl is set but no credentials; skipping GitHub Packages repository")
-    }
-}
-
-findLocalProperty("ani.build.mediamp.path")?.let { mediampPath ->
-    println("i:: Including mediamp as a Composite Build from: $mediampPath")
-    includeBuild(mediampPath) {
-        dependencySubstitution {
-            substitute(module("org.openani.mediamp:mediamp-api"))
-                .using(project(":mediamp-api"))
-            substitute(module("org.openani.mediamp:mediamp-exoplayer"))
-                .using(project(":mediamp-exoplayer"))
-            substitute(module("org.openani.mediamp:mediamp-mpv"))
-                .using(project(":mediamp-mpv"))
-            /*substitute(module("org.openani.mediamp:mediamp-ffmpeg"))
-                .using(project(":mediamp-ffmpeg"))*/
-            substitute(module("org.openani.mediamp:mediamp-test"))
-                .using(project(":mediamp-test"))
-            substitute(module("org.openani.mediamp:mediamp-source-ktxio"))
-                .using(project(":mediamp-source-ktxio"))
-            substitute(module("org.openani.mediamp:mediamp-avkit"))
-                .using(project(":mediamp-avkit"))
-        }
     }
 }
 

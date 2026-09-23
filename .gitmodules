@@ -2,3 +2,6 @@
 	path = torrent/anitorrent/anitorrent-native/libs/boost
 	url = https://github.com/open-ani/boost.git
 	branch = main
+[submodule "mediamp"]
+	path = thirdparty/mediamp
+	url = https://github.com/AAAA1111-Lab/mediamp.git
