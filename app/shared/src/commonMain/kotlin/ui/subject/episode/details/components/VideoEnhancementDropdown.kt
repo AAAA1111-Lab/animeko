@@ -9,16 +9,14 @@
 
 package me.him188.ani.app.ui.subject.episode.details.components
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import me.him188.ani.app.ui.foundation.widgets.SelectableDropdownMenuItem
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.video_player_fast
@@ -38,21 +36,25 @@ fun VideoEnhancementDropdown(
 ) {
     val mode by videoEnhancement.mode.collectAsState()
     val title = stringResource(Lang.video_player_video_enhancement)
-    val qualityText = stringResource(Lang.video_player_quality)
-    val performanceText = stringResource(Lang.video_player_performance)
-    val fastText = stringResource(Lang.video_player_fast)
-    val offText = stringResource(Lang.video_player_off)
 
     DropdownMenu(
         expanded = showDropdown,
         onDismissRequest = onDismissRequest,
     ) {
-        // Shares the menu items' content padding so the heading lines up with their labels; a
-        // separate horizontal padding would indent it relative to every item below it.
-        Text(
-            title,
-            modifier = Modifier.padding(MenuDefaults.DropdownMenuItemContentPadding),
-            style = MaterialTheme.typography.titleSmall,
+        // The heading is a [DropdownMenuItem] with no action rather than a bare [Text]: a menu item
+        // brings its own content padding and minimum height, so the heading lines up with the
+        // labels below and its row is exactly as tall as theirs. A [Text] row would be sized by its
+        // own line box and come out short.
+        DropdownMenuItem(
+            text = { Text(title, style = MaterialTheme.typography.titleSmall) },
+            onClick = {},
+            enabled = false,
+            // `enabled = false` is only used to make the item non-interactive; keep the heading
+            // fully opaque instead of inheriting the disabled 38% alpha.
+            colors = MenuDefaults.itemColors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            interactionSource = null,
         )
         listOf(
             VideoEnhancementMode.QUALITY,
@@ -65,10 +67,10 @@ fun VideoEnhancementDropdown(
                 text = {
                     Text(
                         when (item) {
-                            VideoEnhancementMode.OFF -> offText
-                            VideoEnhancementMode.FAST -> fastText
-                            VideoEnhancementMode.PERFORMANCE -> performanceText
-                            VideoEnhancementMode.QUALITY -> qualityText
+                            VideoEnhancementMode.OFF -> stringResource(Lang.video_player_off)
+                            VideoEnhancementMode.FAST -> stringResource(Lang.video_player_fast)
+                            VideoEnhancementMode.PERFORMANCE -> stringResource(Lang.video_player_performance)
+                            VideoEnhancementMode.QUALITY -> stringResource(Lang.video_player_quality)
                         },
                     )
                 },

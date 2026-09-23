@@ -614,6 +614,8 @@ private fun EpisodeScreenTabletVeryWide(
                                         page.loadError?.let { vm.retryLoad(it) }
                                     },
                                     danmakuListState = vm.danmakuListState.collectAsStateWithLifecycle().value,
+                                    onCacheDanmaku = { vm.cacheCurrentDanmaku() },
+                                    isCachingDanmaku = vm.isCachingDanmaku.collectAsStateWithLifecycle<Boolean>().value,
                                 )
                             }
                         }
@@ -784,6 +786,8 @@ private fun EpisodeScreenContentPhone(
                     },
                     modifier = Modifier.fillMaxSize(),
                     danmakuListState = vm.danmakuListState.collectAsStateWithLifecycle().value,
+                    onCacheDanmaku = { vm.cacheCurrentDanmaku() },
+                    isCachingDanmaku = vm.isCachingDanmaku.collectAsStateWithLifecycle<Boolean>().value,
                 )
             }
         },

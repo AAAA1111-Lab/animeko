@@ -11,6 +11,7 @@ package me.him188.ani.app.ui.settings.tabs.media
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
 import me.him188.ani.app.data.models.preference.DanmakuCacheStrategy
 import me.him188.ani.app.data.models.preference.MediaCacheSettings
 import me.him188.ani.app.platform.PermissionManager
@@ -43,10 +46,16 @@ import me.him188.ani.app.ui.lang.settings_storage_backup_op_restore_error
 import me.him188.ani.app.ui.lang.settings_storage_backup_op_restore_succees
 import me.him188.ani.app.ui.lang.settings_storage_backup_op_restore_warning
 import me.him188.ani.app.ui.lang.settings_storage_backup_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_confirm_text
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_confirm_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_description
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_done
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_title
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_cache_on_collection_doing_media_play
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_cache_on_media_cache
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_do_not_cache
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_title
+import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_cached
 import me.him188.ani.app.ui.settings.framework.SettingsState
 import me.him188.ani.app.ui.settings.framework.components.DropdownItem
 import me.him188.ani.app.ui.settings.framework.components.SettingsScope
@@ -60,6 +69,14 @@ class CacheDirectoryGroupState(
     val permissionManager: PermissionManager,
     val onGetBackupData: suspend () -> String,
     val onRestoreSettings: suspend (String) -> Boolean,
+    /**
+     * 本地已缓存的弹幕总条数. `null` 表示还在加载.
+     */
+    val cachedDanmakuCountFlow: Flow<Int>,
+    /**
+     * 清空全部弹幕缓存, 返回被清除的条数.
+     */
+    val onClearDanmakuCache: suspend () -> Int,
 )
 
 @Composable
@@ -129,6 +146,9 @@ fun SettingsScope.BackupSettings(state: CacheDirectoryGroupState) {
 fun SettingsScope.DanmakuCacheSettings(state: CacheDirectoryGroupState) {
     val mediaCacheSettings by state.mediaCacheSettingsState
     val tasker = rememberAsyncHandler()
+    val toaster = LocalToaster.current
+    val cachedDanmakuCount by state.cachedDanmakuCountFlow.collectAsStateWithLifecycle<Int?>(initialValue = null)
+    var showClearDanmakuCacheDialog by remember { mutableStateOf(false) }
 
     DropdownItem(
         title = { Text(stringResource(Lang.settings_storage_danmaku_cache_strategy_title)) },
@@ -165,6 +185,51 @@ fun SettingsScope.DanmakuCacheSettings(state: CacheDirectoryGroupState) {
             }
         },
     )
+
+    val clearTitleText = stringResource(Lang.settings_storage_danmaku_cache_clear_title)
+    val clearDescriptionText = stringResource(Lang.settings_storage_danmaku_cache_clear_description)
+    TextItem(
+        title = { Text(clearTitleText) },
+        description = {
+            val count = cachedDanmakuCount
+            if (count != null && count > 0) {
+                Text(stringResource(Lang.subject_episode_danmaku_cache_cached, count))
+            } else {
+                Text(clearDescriptionText)
+            }
+        },
+        onClick = { showClearDanmakuCacheDialog = true },
+        onClickEnabled = (cachedDanmakuCount ?: 0) > 0,
+    )
+
+    if (showClearDanmakuCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDanmakuCacheDialog = false },
+            icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(Lang.settings_storage_danmaku_cache_clear_confirm_title)) },
+            text = { Text(stringResource(Lang.settings_storage_danmaku_cache_clear_confirm_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDanmakuCacheDialog = false
+                        tasker.launch {
+                            val removed = state.onClearDanmakuCache()
+                            if (removed > 0) {
+                                toaster.toast(getString(Lang.settings_storage_danmaku_cache_clear_done, removed))
+                            }
+                        }
+                    },
+                ) {
+                    Text(stringResource(Lang.settings_danmaku_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton({ showClearDanmakuCacheDialog = false }) {
+                    Text(stringResource(Lang.settings_danmaku_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable

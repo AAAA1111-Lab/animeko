@@ -220,6 +220,8 @@ fun EpisodeDetails(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
     danmakuListState: DanmakuListState? = null,
+    onCacheDanmaku: () -> Unit = {},
+    isCachingDanmaku: Boolean = false,
 ) {
     var showSubjectDetails by rememberSaveable {
         mutableStateOf(false)
@@ -555,6 +557,8 @@ fun EpisodeDetails(
                     onAdjustShift = { serviceId ->
                         editingShiftServiceId = serviceId
                     },
+                    onCacheDanmaku = onCacheDanmaku,
+                    isCachingDanmaku = isCachingDanmaku,
                 )
             }
         } else null,
@@ -649,6 +653,8 @@ fun EpisodeDetails(
                             onAdjustShift = { serviceId ->
                                 editingShiftServiceId = serviceId
                             },
+                            onCacheDanmaku = onCacheDanmaku,
+                            isCachingDanmaku = isCachingDanmaku,
                             modifier = Modifier.padding(horizontal = 8.dp),
                         )
                     }

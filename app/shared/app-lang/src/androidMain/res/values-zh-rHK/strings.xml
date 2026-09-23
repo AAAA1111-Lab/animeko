@@ -1336,6 +1336,15 @@
     <string name="subject_episode_danmaku_list_empty">暫無彈幕資料</string>
     <string name="subject_episode_danmaku_list_empty_filtered">沒有符合篩選條件的彈幕</string>
     <string name="subject_episode_danmaku_list_title">彈幕列表</string>
+    <string name="subject_episode_danmaku_cache_action">快取彈幕, 離線可用</string>
+    <string name="subject_episode_danmaku_cache_cached">已快取彈幕 · %1$d</string>
+    <string name="subject_episode_danmaku_cache_caching">正在快取…</string>
+    <string name="subject_episode_danmaku_cache_description">下次播放直接從本機讀取, 無需連網</string>
+    <string name="settings_storage_danmaku_cache_clear_title">清空彈幕快取</string>
+    <string name="settings_storage_danmaku_cache_clear_description">刪除本機儲存的全部彈幕</string>
+    <string name="settings_storage_danmaku_cache_clear_confirm_title">清空彈幕快取？</string>
+    <string name="settings_storage_danmaku_cache_clear_confirm_text">將刪除本機儲存的全部彈幕。下次播放時會重新從彈幕來源下載。</string>
+    <string name="settings_storage_danmaku_cache_clear_done">已清空 %1$d 條彈幕</string>
     <string name="subject_episode_collapse">收起</string>
     <string name="subject_episode_expand">展開</string>
     <string name="subject_episode_more_options">更多選項</string>

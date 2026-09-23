@@ -29,6 +29,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -693,6 +695,7 @@ class EpisodeViewModel(
     val danmakuListStateProducer = DanmakuListStateProducer(
         danmakuFlow = allDanmakuListFlow,
         fetchResultsFlow = episodeDanmakuLoader.fetchResults,
+        cachedCountFlow = episodeDanmakuLoader.cachedDanmakuCountFlow,
     )
 
     val danmakuListState = danmakuListStateProducer.stateFlow
@@ -701,6 +704,33 @@ class EpisodeViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = DanmakuListState.Loading,
         )
+
+    /**
+     * 播放页"缓存弹幕"入口的进行中状态.
+     */
+    private val _isCachingDanmaku = MutableStateFlow(false)
+    val isCachingDanmaku: StateFlow<Boolean> = _isCachingDanmaku.asStateFlow()
+
+    /**
+     * 把当前集的弹幕显式写入本地缓存.
+     *
+     * 与自动缓存不同, 这里不看设置里的缓存策略: 用户主动点了一定要落盘, 否则点了没反应.
+     */
+    fun cacheCurrentDanmaku() {
+        if (_isCachingDanmaku.value) return
+        _isCachingDanmaku.value = true
+        launchInBackground {
+            try {
+                episodeDanmakuLoader.cacheCurrentEpisode()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.error("Failed to cache danmaku for current episode", e)
+            } finally {
+                _isCachingDanmaku.value = false
+            }
+        }
+    }
 
 
     private val commentStateRestarter = FlowRestarter()

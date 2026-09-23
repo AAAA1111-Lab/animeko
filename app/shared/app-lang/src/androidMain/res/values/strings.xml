@@ -1350,6 +1350,15 @@
     <string name="subject_episode_danmaku_list_empty">No danmaku data</string>
     <string name="subject_episode_danmaku_list_empty_filtered">No danmaku matches the current filters</string>
     <string name="subject_episode_danmaku_list_title">Danmaku list</string>
+    <string name="subject_episode_danmaku_cache_action">Cache danmaku for offline use</string>
+    <string name="subject_episode_danmaku_cache_cached">Danmaku cached · %1$d</string>
+    <string name="subject_episode_danmaku_cache_caching">Caching…</string>
+    <string name="subject_episode_danmaku_cache_description">Loads from local cache next time, no network needed</string>
+    <string name="settings_storage_danmaku_cache_clear_title">Clear danmaku cache</string>
+    <string name="settings_storage_danmaku_cache_clear_description">Deletes all danmaku saved on this device</string>
+    <string name="settings_storage_danmaku_cache_clear_confirm_title">Clear danmaku cache?</string>
+    <string name="settings_storage_danmaku_cache_clear_confirm_text">All danmaku saved on this device will be deleted. They will be downloaded again from the danmaku sources next time you play.</string>
+    <string name="settings_storage_danmaku_cache_clear_done">Cleared %1$d danmaku</string>
     <string name="subject_episode_collapse">Collapse</string>
     <string name="subject_episode_expand">Expand</string>
     <string name="subject_episode_more_options">More options</string>
