@@ -60,6 +60,12 @@ class DanmakuEntity(
     @Embedded(prefix = "content_") val content: DanmakuContent
 )
 
+/** One row of [DanmakuDao.episodeDanmakuCountsFlow]. */
+class EpisodeDanmakuCount(
+    val episodeId: Int,
+    val count: Int,
+)
+
 @Dao
 interface DanmakuDao {
     @Query("SELECT COUNT(*) FROM danmaku WHERE subjectId = :subjectId AND episodeId = :episodeId")
@@ -79,6 +85,16 @@ interface DanmakuDao {
 
     @Query("SELECT COUNT(*) FROM danmaku")
     suspend fun countAll(): Int
+
+    /**
+     * Cached danmaku count per episode of one subject. Episodes with no cached danmaku are absent
+     * rather than present with a zero count.
+     *
+     * Returns a single row per episode number, so callers can render "already cached" per episode
+     * and work out which episodes a bulk cache still has to fetch.
+     */
+    @Query("SELECT episodeId AS episodeId, COUNT(*) AS count FROM danmaku WHERE subjectId = :subjectId GROUP BY episodeId")
+    fun episodeDanmakuCountsFlow(subjectId: Int): Flow<List<EpisodeDanmakuCount>>
 
     @Query("SELECT COUNT(*) FROM danmaku")
     fun countAllFlow(): Flow<Int>

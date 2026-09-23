@@ -1402,6 +1402,8 @@
     <string name="cache_danmaku_all_action">缓存全部弹幕</string>
     <string name="cache_danmaku_all_progress">%1$d/%2$d</string>
     <string name="cache_danmaku_all_done">已缓存 %1$d 集的弹幕</string>
+    <string name="cache_danmaku_all_complete">弹幕已全部缓存</string>
+    <string name="cache_danmaku_episode_cached">弹幕 %1$d</string>
     <string name="subject_episode_collapse">收起</string>
     <string name="subject_episode_expand">展开</string>
     <string name="subject_episode_more_options">更多选项</string>

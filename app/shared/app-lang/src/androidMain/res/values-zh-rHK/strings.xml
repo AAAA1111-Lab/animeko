@@ -1348,6 +1348,8 @@
     <string name="cache_danmaku_all_action">快取全部彈幕</string>
     <string name="cache_danmaku_all_progress">%1$d/%2$d</string>
     <string name="cache_danmaku_all_done">已快取 %1$d 集的彈幕</string>
+    <string name="cache_danmaku_all_complete">彈幕已全部快取</string>
+    <string name="cache_danmaku_episode_cached">彈幕 %1$d</string>
     <string name="subject_episode_collapse">收起</string>
     <string name="subject_episode_expand">展開</string>
     <string name="subject_episode_more_options">更多選項</string>
