@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
+import me.him188.ani.app.data.models.episode.displayName
 import me.him188.ani.app.data.repository.danmaku.SearchDanmakuRequest
 import me.him188.ani.app.domain.danmaku.DanmakuFetcher
 import me.him188.ani.app.domain.danmaku.DanmakuLoaderImpl
@@ -41,6 +42,7 @@ import me.him188.ani.danmaku.api.DanmakuInfo
 import me.him188.ani.danmaku.api.DanmakuServiceId
 import me.him188.ani.danmaku.api.DanmakuSession
 import me.him188.ani.danmaku.api.TimeBasedDanmakuSession
+import me.him188.ani.danmaku.api.provider.DanmakuFetchRequest
 import me.him188.ani.danmaku.api.provider.DanmakuFetchResult
 import me.him188.ani.danmaku.api.provider.DanmakuMatchInfo
 import me.him188.ani.danmaku.api.provider.DanmakuMatchMethod
@@ -48,6 +50,7 @@ import me.him188.ani.danmaku.api.provider.DanmakuProviderId
 import me.him188.ani.datasources.api.Media
 import me.him188.ani.utils.logging.info
 import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.warn
 import me.him188.ani.utils.platform.annotations.TestOnly
 import org.openani.mediamp.MediampPlayer
 import org.openani.mediamp.features.PlaybackSpeed
@@ -112,6 +115,7 @@ class EpisodeDanmakuLoader(
                 }
             }
             .onEach {
+                currentRequest.value = it
                 logger.info { "New SearchDanmakuRequest: $it" }
             },
         backgroundScope,
@@ -121,6 +125,11 @@ class EpisodeDanmakuLoader(
 
     private val config = MutableStateFlow(persistentMapOf<DanmakuServiceId, DanmakuOriginConfig>())
     val configFlow = config.asStateFlow()
+
+    /**
+     * 最近一次弹幕请求. 用户在播放页点击"缓存弹幕"时用它定位当前剧集, 并作为兜底重新拉取的请求.
+     */
+    private val currentRequest = MutableStateFlow<SearchDanmakuRequest?>(null)
 
 
     private val danmakuSessionFlow: Flow<DanmakuSession> = config.mapLatest { configMap ->
@@ -133,25 +142,69 @@ class EpisodeDanmakuLoader(
 
     val danmakuLoadingStateFlow: StateFlow<DanmakuLoadingState> = danmakuLoader.danmakuLoadingStateFlow
 
-    // this flow must emit a value quickly when started, otherwise it will block ui
-    val fetchResults: Flow<List<DanmakuFetchResultWithConfig>> = combine(
-        danmakuLoader.fetchResultFlow.onStart { emit(null) },
-        configFlow,
-    ) { results, configs ->
-        results.orEmpty().map {
-            DanmakuFetchResultWithConfig(
-                it.providerId,
-                it.matchInfo.serviceId,
-                it.matchInfo,
-                configs[it.matchInfo.serviceId] ?: DanmakuOriginConfig.Default,
-            )
-        }
-    }.shareIn(flowScope, started = sharingStarted, replay = 1)
-
     val danmakuEventFlow: Flow<DanmakuEvent> = danmakuSessionFlow.flatMapLatest { it.events }
 
     suspend fun requestRepopulate() {
         danmakuSessionFlow.first().requestRepopulate()
+    }
+
+    /**
+     * 最近一次弹幕请求的结果, 用于显式缓存时复用已经取到的数据.
+     */
+    private val latestFetchResults = MutableStateFlow<List<DanmakuFetchResult>?>(null)
+
+    // this flow must emit a value quickly when started, otherwise it will block ui
+    val fetchResults: Flow<List<DanmakuFetchResultWithConfig>> = danmakuLoader.fetchResultFlow
+        .onEach { latestFetchResults.value = it }
+        .combine(configFlow) { results, configs ->
+            results.orEmpty().map {
+                DanmakuFetchResultWithConfig(
+                    it.providerId,
+                    it.matchInfo.serviceId,
+                    it.matchInfo,
+                    configs[it.matchInfo.serviceId] ?: DanmakuOriginConfig.Default,
+                )
+            }
+        }.shareIn(flowScope, started = sharingStarted, replay = 1)
+
+    /**
+     * 当前集弹幕在本地缓存中的条数.
+     */
+    val cachedDanmakuCountFlow: Flow<Int> = bundleFlow
+        .map { danmakuRepository.cachedDanmakuCountFlow(it.subjectId, it.episodeId) }
+        .flatMapLatest { it }
+        .distinctUntilChanged()
+
+    /**
+     * 用户在播放页显式点击"缓存弹幕".
+     *
+     * 优先复用本次播放已经取到的弹幕; 只有在还没有任何结果时才重新向所有远端弹幕源请求, 避免用户点一下
+     * 就重复打一遍接口.
+     *
+     * 策略 ([me.him188.ani.app.data.models.preference.DanmakuCacheStrategy]) 只约束自动缓存, 不影响这里:
+     * 用户主动要求的动作不应该被静默忽略.
+     */
+    suspend fun cacheCurrentEpisode() {
+        val request = currentRequest.value
+        if (request == null) {
+            logger.warn { "cacheCurrentEpisode: no danmaku request yet, ignored" }
+            return
+        }
+        val subjectId = request.subjectInfo.subjectId
+        val episodeId = request.episodeId
+
+        val existing = latestFetchResults.value
+            .orEmpty()
+            .filter { it.providerId != DanmakuProviderId.Local }
+        if (existing.any { it.list.isNotEmpty() }) {
+            danmakuRepository.saveToLocalCache(subjectId, episodeId, existing)
+            logger.info {
+                "cacheCurrentEpisode: saved ${existing.sumOf { it.list.size }} danmaku from existing results"
+            }
+        } else {
+            val count = danmakuRepository.fetchAndCacheNow(request.toFetchRequest())
+            logger.info { "cacheCurrentEpisode: fetched and saved $count danmaku" }
+        }
     }
 
     fun getInteractiveDanmakuFetcherOrNull(providerId: DanmakuProviderId?): DanmakuFetcher? {
@@ -251,6 +304,23 @@ class EpisodeDanmakuLoader(
             } else emptyList()
         } ?: emptyList()
     }.shareIn(flowScope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
+
+    private fun SearchDanmakuRequest.toFetchRequest(): DanmakuFetchRequest {
+        return DanmakuFetchRequest(
+            subjectId = subjectInfo.subjectId,
+            subjectPrimaryName = subjectInfo.displayName,
+            subjectNames = subjectInfo.allNames,
+            subjectPublishDate = subjectInfo.airDate,
+            episodeId = episodeId,
+            episodeSort = episodeInfo.sort,
+            episodeEp = episodeInfo.ep,
+            episodeName = episodeInfo.displayName,
+            filename = filename,
+            fileHash = fileHash,
+            fileSize = fileLength,
+            videoDuration = videoDuration,
+        )
+    }
 
     private companion object {
         private val logger = logger<EpisodeDanmakuLoader>()

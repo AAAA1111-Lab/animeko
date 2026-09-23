@@ -53,6 +53,7 @@ import me.him188.ani.app.data.repository.user.TokenRepository
 import me.him188.ani.app.data.repository.user.TokenSave
 import me.him188.ani.app.domain.foundation.HttpClientProvider
 import me.him188.ani.app.domain.foundation.get
+import me.him188.ani.app.domain.danmaku.DanmakuRepository
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
 import me.him188.ani.app.domain.mediasource.codec.MediaSourceCodecManager
 import me.him188.ani.app.domain.mediasource.codec.serializeSubscriptionToString
@@ -101,6 +102,7 @@ class SettingsViewModel : AbstractSettingsViewModel(), KoinComponent {
     private val settingsRepository: SettingsRepository by inject()
     private val permissionManager: PermissionManager by inject()
     private val danmakuRegexFilterRepository: DanmakuRegexFilterRepository by inject()
+    private val danmakuRepository: DanmakuRepository by inject()
 
     private val mediaSourceManager: MediaSourceManager by inject()
     private val mediaSourceInstanceRepository: MediaSourceInstanceRepository by inject()
@@ -186,6 +188,12 @@ class SettingsViewModel : AbstractSettingsViewModel(), KoinComponent {
         onRestoreSettings = {
             withContext(Dispatchers.IO_) {
                 restoreSettingsBackup(it)
+            }
+        },
+        cachedDanmakuCountFlow = danmakuRepository.cachedDanmakuCountFlow,
+        onClearDanmakuCache = {
+            withContext(Dispatchers.IO_) {
+                danmakuRepository.clearCachedDanmaku()
             }
         },
     )

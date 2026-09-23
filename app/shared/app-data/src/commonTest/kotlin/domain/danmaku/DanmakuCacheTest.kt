@@ -286,6 +286,11 @@ class DanmakuCacheTest {
 
         override suspend fun deleteBySubject(subjectId: Int) = Unit
         override suspend fun deleteBySubjectAndEpisode(subjectId: Int, episodeId: Int) = Unit
+        override suspend fun countAll(): Int = upsertCalls.sumOf { it.size }
+        override fun countAllFlow(): Flow<Int> = MutableStateFlow(upsertCalls.sumOf { it.size })
+        override suspend fun deleteAll() {
+            upsertCalls.clear()
+        }
     }
 
     private object TestMediaCache : MediaCache {

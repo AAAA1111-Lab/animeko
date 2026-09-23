@@ -12,6 +12,7 @@ package me.him188.ani.app.domain.danmaku
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -86,6 +87,29 @@ class DanmakuRepository(
 
     val selfId: Flow<String?> get() = sender.selfId
 
+    /**
+     * 本地已缓存的弹幕总条数, 用于设置页展示与清理确认.
+     */
+    val cachedDanmakuCountFlow: Flow<Int> = danmakuDao.countAllFlow().distinctUntilChanged()
+
+    /**
+     * 本地已缓存的某一集弹幕条数, 用于播放页展示该集是否已缓存.
+     */
+    fun cachedDanmakuCountFlow(subjectId: Int, episodeId: Int): Flow<Int> =
+        danmakuDao.countBySubjectAndEpisode(subjectId, episodeId).distinctUntilChanged()
+
+    /**
+     * 清空全部弹幕缓存.
+     *
+     * @return 被清除的弹幕条数.
+     */
+    suspend fun clearCachedDanmaku(): Int {
+        val count = danmakuDao.countAll()
+        danmakuDao.deleteAll()
+        logger.info { "clearCachedDanmaku, removed $count danmaku" }
+        return count
+    }
+
     fun getInteractiveDanmakuFetcherOrNull(providerId: DanmakuProviderId): DanmakuFetcher? {
         return remoteProviders
             .firstOrNull { it is MatchingDanmakuProvider && it.providerId == providerId }
@@ -120,6 +144,33 @@ class DanmakuRepository(
         if (shouldCache(subjectId, episodeId)) {
             saveToLocal(subjectId, episodeId, list)
         }
+    }
+
+    /**
+     * 显式把已取到的弹幕写入本地缓存, 不检查 [shouldCache].
+     *
+     * 与 [cacheDanmakuIfNeeded] 的区别在于: 前者是用户主动要求的动作, 策略只决定"自动缓存"的行为,
+     * 不应该让用户点了没有反应.
+     *
+     * 与 [cacheDanmakuIfNeeded] 相同的是仍然忽略 [DanmakuProviderId.Local] 的数据源, 它的内容本来就来自
+     * 本地缓存, 再写回去只会把[presentationServiceId] 覆盖成 `Local`.
+     */
+    suspend fun saveToLocalCache(subjectId: Int, episodeId: Int, list: List<DanmakuFetchResult>) {
+        saveToLocal(subjectId, episodeId, list)
+    }
+
+    /**
+     * 从所有远端弹幕源拉取并写入本地缓存, 不检查 [shouldCache].
+     *
+     * 用于用户在播放页显式点击"缓存弹幕". 调用方应先用 [fetchFromLocal] 之外的已有结果, 只有结果为空时
+     * 才需要走这里, 避免重复请求.
+     *
+     * @return 实际写入的弹幕条数.
+     */
+    suspend fun fetchAndCacheNow(request: DanmakuFetchRequest): Int {
+        val results = fetchFromAllRemotes(request).first()
+        saveToLocal(request.subjectId, request.episodeId, results)
+        return results.sumOf { it.list.size }
     }
 
     fun deleteDanmakuIfDontNeeded(subjectId: Int, episodeId: Int) = backgroundScope.launch {

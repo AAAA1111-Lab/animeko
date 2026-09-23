@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.outlined.FeaturedPlayList
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
@@ -76,6 +77,10 @@ import me.him188.ani.app.ui.foundation.a
 import me.him188.ani.app.ui.foundation.lists.LazyListVerticalScrollbar
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.subject_episode_collapse
+import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_action
+import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_cached
+import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_caching
+import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_description
 import me.him188.ani.app.ui.lang.subject_episode_danmaku_list_empty
 import me.him188.ani.app.ui.lang.subject_episode_danmaku_list_empty_filtered
 import me.him188.ani.app.ui.lang.subject_episode_danmaku_list_title
@@ -106,6 +111,8 @@ fun DanmakuListSection(
     onSetEnabled: (DanmakuServiceId, Boolean) -> Unit,
     onManualMatch: (DanmakuServiceId) -> Unit,
     onAdjustShift: (DanmakuServiceId) -> Unit,
+    onCacheDanmaku: () -> Unit,
+    isCachingDanmaku: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val listTitleText = stringResource(Lang.subject_episode_danmaku_list_title)
@@ -131,6 +138,8 @@ fun DanmakuListSection(
                         onSetEnabled = onSetEnabled,
                         onManualMatch = onManualMatch,
                         onAdjustShift = onAdjustShift,
+                        onCacheDanmaku = onCacheDanmaku,
+                        isCachingDanmaku = isCachingDanmaku,
                         modifier = Modifier.padding(top = 64.dp),
                     )
                 }
@@ -175,6 +184,8 @@ fun DanmakuListContent(
     onSetEnabled: (DanmakuServiceId, Boolean) -> Unit,
     onManualMatch: (DanmakuServiceId) -> Unit,
     onAdjustShift: (DanmakuServiceId) -> Unit,
+    onCacheDanmaku: () -> Unit,
+    isCachingDanmaku: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val emptyText = if (state.isEmpty) {
@@ -194,6 +205,12 @@ fun DanmakuListContent(
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
+
+        DanmakuCacheRow(
+            cacheStatus = state.cacheStatus,
+            isCaching = isCachingDanmaku,
+            onCache = onCacheDanmaku,
+        )
 
         // 弹幕列表
         if (state.danmakuItems.isEmpty()) {
@@ -448,6 +465,66 @@ private fun getDanmakuServiceIconInfo(serviceId: DanmakuServiceId): String {
         DanmakuServiceId.Tucao -> "TC"
         else -> "?"
     }
+}
+
+/**
+ * 弹幕本地缓存入口. 已缓存时只展示条目数, 未缓存时提供一次性写入的动作.
+ *
+ * 弹幕本身的自动缓存受设置里的策略约束, 这里给的是一个不受策略影响的显式入口, 用户点了就一定会写盘.
+ */
+@Composable
+private fun DanmakuCacheRow(
+    cacheStatus: DanmakuCacheStatus,
+    isCaching: Boolean,
+    onCache: () -> Unit,
+) {
+    val cachedText = stringResource(Lang.subject_episode_danmaku_cache_cached, cacheStatus.cachedCount)
+    val cachingText = stringResource(Lang.subject_episode_danmaku_cache_caching)
+    val actionText = stringResource(Lang.subject_episode_danmaku_cache_action)
+    val descriptionText = stringResource(Lang.subject_episode_danmaku_cache_description)
+
+    val isCached = cacheStatus.isCached
+    // 还没取到任何远端弹幕时点了也只会写进空数据, 所以先禁用.
+    val canCache = !isCached && !isCaching && cacheStatus.availableCount > 0
+
+    ListItem(
+        headlineContent = {
+            Text(
+                text = when {
+                    isCaching -> cachingText
+                    isCached -> cachedText
+                    else -> actionText
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isCached) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+            )
+        },
+        leadingContent = {
+            Icon(
+                if (isCached) Icons.Outlined.CheckCircle else Icons.Outlined.CloudDownload,
+                contentDescription = null,
+                tint = if (isCached) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+            )
+        },
+        trailingContent = {
+            if (isCaching) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+        },
+        supportingContent = if (isCached) null else {
+            { Text(descriptionText, style = MaterialTheme.typography.bodySmall) }
+        },
+        modifier = Modifier.clickable(enabled = canCache) { onCache() },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 /**

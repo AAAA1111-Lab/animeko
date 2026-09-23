@@ -76,6 +76,15 @@ interface DanmakuDao {
 
     @Query("DELETE FROM danmaku WHERE subjectId = :subjectId AND episodeId = :episodeId")
     suspend fun deleteBySubjectAndEpisode(subjectId: Int, episodeId: Int)
+
+    @Query("SELECT COUNT(*) FROM danmaku")
+    suspend fun countAll(): Int
+
+    @Query("SELECT COUNT(*) FROM danmaku")
+    fun countAllFlow(): Flow<Int>
+
+    @Query("DELETE FROM danmaku")
+    suspend fun deleteAll()
 }
 
 
