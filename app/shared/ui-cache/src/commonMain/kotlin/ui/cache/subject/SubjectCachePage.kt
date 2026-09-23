@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.FilePresent
 import androidx.compose.material.icons.rounded.VideoFile
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -96,6 +98,9 @@ import me.him188.ani.app.ui.foundation.theme.AniThemeDefaults
 import me.him188.ani.app.ui.foundation.theme.appChromeHazeSource
 import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
+import me.him188.ani.app.ui.lang.cache_danmaku_all_action
+import me.him188.ani.app.ui.lang.cache_danmaku_all_done
+import me.him188.ani.app.ui.lang.cache_danmaku_all_progress
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
 import me.him188.ani.app.ui.lang.cache_filter_collection_dropped
 import me.him188.ani.app.ui.lang.cache_import_already_imported
@@ -173,6 +178,21 @@ fun SubjectCacheScreen(
 ) {
     val cachedEpisodes by vm.cacheEpisodesFlow.collectAsStateWithLifecycle()
     val allEpisodes by vm.allEpisodesFlow.collectAsStateWithLifecycle(emptyList())
+    val danmakuCacheState by vm.danmakuCacheStateFlow.collectAsStateWithLifecycle()
+    val toaster = LocalToaster.current
+    val danmakuCacheDoneTemplate = stringResource(Lang.cache_danmaku_all_done)
+
+    // 批量缓存完成时提示结果. 只在"运行中 -> 结束"的这一次触发, 否则进入页面就会弹一次旧结果.
+    var wasCachingDanmaku by remember { mutableStateOf(false) }
+    LaunchedEffect(danmakuCacheState.isRunning, danmakuCacheState.succeeded) {
+        if (wasCachingDanmaku && !danmakuCacheState.isRunning && danmakuCacheState.succeeded > 0) {
+            toaster.show(
+                danmakuCacheDoneTemplate.replace("%1\$d", danmakuCacheState.succeeded.toString()),
+            )
+        }
+        wasCachingDanmaku = danmakuCacheState.isRunning
+    }
+
     SubjectCachePage(
         title = vm.subjectTitle,
         cacheListState = vm.cacheListState,
@@ -188,6 +208,8 @@ fun SubjectCacheScreen(
         onPauseAll = { vm.pauseAllCaches() },
         onResumeAll = { vm.resumeAllCaches() },
         onImportLocalFiles = { vm.importLocalFiles(it) },
+        danmakuCacheState = danmakuCacheState,
+        onCacheAllDanmaku = { vm.cacheAllDanmaku() },
         modifier = modifier,
         windowInsets = windowInsets,
         navigationIcon = navigationIcon,
@@ -215,6 +237,8 @@ fun SubjectCachePage(
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
     navigationIcon: @Composable () -> Unit = {},
     allEpisodes: List<EpisodeInfo> = emptyList(),
+    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    onCacheAllDanmaku: (() -> Unit)? = null,
     onImportLocalFiles: (suspend (List<LocalImportFileItem>) -> Int)? = null,
 ) {
     val selectionState = rememberCacheSelectionState()
@@ -435,6 +459,8 @@ fun SubjectCachePage(
                 onPauseAll = onPauseAll,
                 onResumeAll = onResumeAll,
                 modifier = Modifier.fillMaxWidth(),
+                danmakuCacheState = danmakuCacheState,
+                onCacheAllDanmaku = onCacheAllDanmaku,
             )
 
             LazyVerticalGrid(
@@ -550,7 +576,7 @@ fun LazyGridScope.subjectCacheEpisodeItems(
 }
 
 /**
- * "15/28 已完成 · 12.4 GB · 2 个下载中" + "全部暂停/全部继续".
+ * "15/28 已完成 · 12.4 GB · 2 个下载中" + "全部暂停/全部继续" + "缓存全部弹幕".
  * 多选模式下变为 "已选 3 项 · 共 3.4 GB · 含 1 个下载中".
  */
 @Composable
@@ -562,6 +588,8 @@ fun SubjectCacheSummaryRow(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    onCacheAllDanmaku: (() -> Unit)? = null,
 ) {
     Row(
         modifier
@@ -585,6 +613,9 @@ fun SubjectCacheSummaryRow(
         )
 
         if (!inSelection) {
+            if (onCacheAllDanmaku != null) {
+                DanmakuCacheAllButton(danmakuCacheState, onCacheAllDanmaku)
+            }
             PauseOrResumeAllTextButton(cachedEpisodes, onPauseAll, onResumeAll)
         }
     }
@@ -741,10 +772,25 @@ fun SubjectCacheDetailPaneContent(
     singlePane: Boolean = false,
 ) {
     val cachedEpisodes by vm.cacheEpisodesFlow.collectAsStateWithLifecycle()
+    val danmakuCacheState by vm.danmakuCacheStateFlow.collectAsStateWithLifecycle()
+    val toaster = LocalToaster.current
+    val danmakuCacheDoneTemplate = stringResource(Lang.cache_danmaku_all_done)
 
     var hideMediaSelector by remember(vm.cacheListState.currentSelectMediaTask) {
         mutableStateOf(false)
     }
+
+    // 批量缓存完成时提示结果. 只在"运行中 -> 结束"的那一次触发, 否则进入页面就会弹一次旧结果.
+    var wasCachingDanmaku by remember { mutableStateOf(false) }
+    LaunchedEffect(danmakuCacheState.isRunning, danmakuCacheState.succeeded) {
+        if (wasCachingDanmaku && !danmakuCacheState.isRunning && danmakuCacheState.succeeded > 0) {
+            toaster.show(
+                danmakuCacheDoneTemplate.replace("%1\$d", danmakuCacheState.succeeded.toString()),
+            )
+        }
+        wasCachingDanmaku = danmakuCacheState.isRunning
+    }
+
     EpisodeCacheRequesterDialogs(
         vm.cacheListState,
         vm.mediaSourceInfoProvider,
@@ -775,6 +821,8 @@ fun SubjectCacheDetailPaneContent(
                     onPauseAll = { vm.pauseAllCaches() },
                     onResumeAll = { vm.resumeAllCaches() },
                     modifier = Modifier.fillMaxWidth(),
+                    danmakuCacheState = danmakuCacheState,
+                    onCacheAllDanmaku = { vm.cacheAllDanmaku() },
                 )
             } else {
                 SubjectCacheDetailHeader(
@@ -783,6 +831,8 @@ fun SubjectCacheDetailPaneContent(
                     totalEpisodeCount = vm.cacheListState.episodes.size.takeIf { it > 0 },
                     onPauseAll = { vm.pauseAllCaches() },
                     onResumeAll = { vm.resumeAllCaches() },
+                    danmakuCacheState = danmakuCacheState,
+                    onCacheAllDanmaku = { vm.cacheAllDanmaku() },
                 )
             }
         }
@@ -814,7 +864,7 @@ fun SubjectCacheDetailPaneContent(
 }
 
 /**
- * 详情栏头部: 条目名 + "15/28 已完成 · 12.4 GB · 2 个下载中" + "全部暂停/全部继续".
+ * 详情栏头部: 条目名 + "15/28 已完成 · 12.4 GB · 2 个下载中" + "全部暂停/全部继续" + "缓存全部弹幕".
  */
 @Composable
 fun SubjectCacheDetailHeader(
@@ -824,6 +874,8 @@ fun SubjectCacheDetailHeader(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    danmakuCacheState: DanmakuCacheBatchState = DanmakuCacheBatchState(),
+    onCacheAllDanmaku: (() -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -850,7 +902,40 @@ fun SubjectCacheDetailHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (onCacheAllDanmaku != null) {
+            DanmakuCacheAllButton(danmakuCacheState, onCacheAllDanmaku)
+        }
         PauseOrResumeAllTextButton(cachedEpisodes, onPauseAll, onResumeAll)
+    }
+}
+
+/**
+ * "缓存全部弹幕" 入口. 批量缓存期间显示进度, 避免看起来没反应.
+ */
+@Composable
+private fun DanmakuCacheAllButton(
+    state: DanmakuCacheBatchState,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (state.isRunning) {
+        Row(
+            modifier.padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Text(
+                stringResource(Lang.cache_danmaku_all_progress, state.done, state.total),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    } else {
+        TextButton(onClick = onClick, modifier = modifier.padding(start = 4.dp)) {
+            Text(stringResource(Lang.cache_danmaku_all_action), maxLines = 1)
+        }
     }
 }
 

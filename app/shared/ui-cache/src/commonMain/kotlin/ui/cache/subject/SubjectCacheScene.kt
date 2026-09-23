@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import me.him188.ani.app.data.models.episode.EpisodeInfo
@@ -120,7 +122,33 @@ interface SubjectCacheViewModel {
      * @return 实际新导入的数量.
      */
     suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int
+
+    /**
+     * 批量缓存该条目弹幕的进度.
+     */
+    val danmakuCacheStateFlow: StateFlow<DanmakuCacheBatchState>
+
+    /**
+     * 缓存该条目全部剧集的弹幕.
+     *
+     * 与媒体缓存的自动弹幕缓存不同, 这是用户主动要求的动作, 因此不检查
+     * [me.him188.ani.app.data.models.preference.DanmakuCacheStrategy].
+     */
+    fun cacheAllDanmaku()
 }
+
+/**
+ * 条目级"缓存全部弹幕"的进度.
+ */
+data class DanmakuCacheBatchState(
+    val isRunning: Boolean = false,
+    /** 已处理的剧集数. */
+    val done: Int = 0,
+    /** 本次要处理的剧集总数. */
+    val total: Int = 0,
+    /** 实际写入弹幕的剧集数, 用于结果提示. */
+    val succeeded: Int = 0,
+)
 
 @Stable
 class SubjectCacheViewModelImpl(
@@ -331,6 +359,65 @@ class SubjectCacheViewModelImpl(
 
     override val allEpisodesFlow: Flow<List<EpisodeInfo>> =
         episodeCollectionsFlow.map { list -> list.map { it.episodeInfo } }
+
+    override val danmakuCacheStateFlow: MutableStateFlow<DanmakuCacheBatchState> =
+        MutableStateFlow(DanmakuCacheBatchState())
+
+    override fun cacheAllDanmaku() {
+        if (danmakuCacheStateFlow.value.isRunning) return
+        launchInBackground {
+            val episodes = episodesFlow.first()
+            if (episodes.isEmpty()) return@launchInBackground
+
+            val subjectInfo = subjectInfoFlow.first().subjectInfo
+            danmakuCacheStateFlow.value = DanmakuCacheBatchState(
+                isRunning = true,
+                total = episodes.size,
+            )
+            var succeeded = 0
+            try {
+                for (episode in episodes) {
+                    val episodeInfo = episodeCollectionsFlow.first()
+                        .firstOrNull { it.episodeId == episode.episodeId }
+                        ?.episodeInfo
+                    if (episodeInfo == null) {
+                        danmakuCacheStateFlow.update { it.copy(done = it.done + 1) }
+                        continue
+                    }
+                    // One unreachable source must not abandon the remaining episodes, so failures
+                    // are counted as "not cached" rather than thrown.
+                    //
+                    // No filename or media is known here — this runs from the cache page, not from
+                    // playback — so providers fall back to matching by episode id / sort. That is
+                    // still an exact match for the Ani source and for dandanplay's episode lookup.
+                    val count = runCatching {
+                        danmakuRepository.fetchAndCacheNow(
+                            DanmakuFetchRequest(
+                                subjectId = subjectInfo.subjectId,
+                                subjectPrimaryName = subjectInfo.displayName,
+                                subjectNames = subjectInfo.allNames,
+                                subjectPublishDate = subjectInfo.airDate,
+                                episodeId = episodeInfo.episodeId,
+                                episodeSort = episodeInfo.sort,
+                                episodeEp = episodeInfo.ep,
+                                episodeName = episodeInfo.displayName,
+                                filename = null,
+                                fileHash = null,
+                                fileSize = null,
+                                videoDuration = Duration.ZERO,
+                            ),
+                        )
+                    }.onFailure {
+                        logger.warn("cacheAllDanmaku: episode ${episodeInfo.episodeId} failed", it)
+                    }.getOrDefault(0)
+                    if (count > 0) succeeded++
+                    danmakuCacheStateFlow.update { it.copy(done = it.done + 1) }
+                }
+            } finally {
+                danmakuCacheStateFlow.update { it.copy(isRunning = false, succeeded = succeeded) }
+            }
+        }
+    }
 
     override suspend fun importLocalFiles(items: List<LocalImportFileItem>): Int {
         if (items.isEmpty()) return 0

@@ -1359,6 +1359,9 @@
     <string name="settings_storage_danmaku_cache_clear_confirm_title">Clear danmaku cache?</string>
     <string name="settings_storage_danmaku_cache_clear_confirm_text">All danmaku saved on this device will be deleted. They will be downloaded again from the danmaku sources next time you play.</string>
     <string name="settings_storage_danmaku_cache_clear_done">Cleared %1$d danmaku</string>
+    <string name="cache_danmaku_all_action">Cache all danmaku</string>
+    <string name="cache_danmaku_all_progress">%1$d/%2$d</string>
+    <string name="cache_danmaku_all_done">Cached danmaku for %1$d episodes</string>
     <string name="subject_episode_collapse">Collapse</string>
     <string name="subject_episode_expand">Expand</string>
     <string name="subject_episode_more_options">More options</string>
