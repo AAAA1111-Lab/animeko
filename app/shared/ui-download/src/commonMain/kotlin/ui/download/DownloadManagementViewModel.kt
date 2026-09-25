@@ -60,7 +60,7 @@ import org.koin.core.component.inject
  */
 class DownloadManagementViewModel(
     downloadManager: MediaDownloadManager,
-    subjects: SubjectCollectionRepository,
+    private val subjects: SubjectCollectionRepository,
     histories: EpisodePlayHistoryRepository,
     operations: DownloadOperations,
     private val presenters: SubjectDownloadsPresenterFactory,
