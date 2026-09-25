@@ -45,6 +45,7 @@ fun SubjectDownloadsDetailPane(
             modifier = modifier,
             contentPadding = contentPadding,
             singlePane = singlePane,
+            danmaku = SubjectDanmakuBatchUi(),
         )
     } else {
         SubjectDownloadsHost(presenter) { state, actions, sourceInfo, danmaku ->

@@ -960,7 +960,7 @@ internal fun List<DownloadItem>.deleteConfirmationKind(): DeleteConfirmationKind
 internal fun DeleteActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    confirmationKind: DeleteConfirmationKind,
+    confirmationKind: DeleteConfirmationKind = DeleteConfirmationKind.REAL_CACHE_ONLY,
     confirmEnabled: Boolean = true,
 ) {
     AlertDialog(
