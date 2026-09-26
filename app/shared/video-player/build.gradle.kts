@@ -36,6 +36,8 @@ kotlin {
         implementation(libs.androidx.media3.ui)
         implementation(libs.androidx.media3.effect)
         implementation(libs.androidx.media3.exoplayer)
+        // SimpleDecoder / Decoder, FLAC 软解渲染器 (media.audio) 需要
+        implementation(libs.androidx.media3.decoder)
         implementation(libs.androidx.media3.exoplayer.dash)
         implementation(libs.androidx.media3.exoplayer.hls)
         implementation(libs.libass.media)
@@ -57,3 +59,7 @@ kotlin {
 //        api(libs.mediamp.avkit.compose)
     }
 }
+
+// Android 端音频 native 库: WSOLA 变速 (libani_wsola) 与 FLAC 软解 (libani_flac).
+// 找不到 NDK 时跳过: FLAC 回退平台解码器, WSOLA 回退 Sonic. 详见 build-logic 的 aniAudioNatives.kt.
+configureAniAudioNatives()

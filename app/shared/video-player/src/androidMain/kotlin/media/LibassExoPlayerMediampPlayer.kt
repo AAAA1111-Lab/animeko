@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import me.him188.ani.app.video.player.media.audio.AniRenderersFactory
 import org.openani.mediamp.ExperimentalMediampApi
 import org.openani.mediamp.InternalForInheritanceMediampApi
 import org.openani.mediamp.MediampPlayer
@@ -402,6 +403,14 @@ class LibassExoPlayerMediampPlayerFactory(
             audioTimeStretch,
             configurePlayerBuilder = { builder ->
                 builder.setLoadControl(aniExoPlayerLoadControl())
+                // 自带渲染器工厂: 注册 FLAC 软解渲染器, 并在高质量变速时安装 WSOLA 处理器链
+                // (mediamp 的内部工厂是 internal 且不含 FLAC 软解, 只能整体替换).
+                builder.setRenderersFactory(
+                    AniRenderersFactory(
+                        context,
+                        highQualityTimeStretch = audioTimeStretch == ExoPlayerAudioTimeStretch.HighQualityWsola,
+                    ),
+                )
             },
         )
     }
