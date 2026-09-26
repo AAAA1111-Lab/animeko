@@ -133,13 +133,22 @@ abstract class AniPrepareNativeAudioJniLibsTask : DefaultTask() {
 }
 
 private fun resolveAniAndroidNdkDir(project: Project): File? {
-    System.getenv("ANDROID_NDK_HOME")?.let { if (File(it).isDirectory) return File(it) }
+    System.getenv("ANDROID_NDK_HOME")?.let { envDir ->
+        val dir = File(envDir)
+        if (dir.isDirectory) return dir
+    }
     val props = java.util.Properties()
     val localPropertiesFile = project.rootDir.resolve("local.properties")
-    if (localPropertiesFile.isFile) props.inputStream().use { props.load(it) }
-    props.getProperty("ndk.dir")?.let { if (File(it).isDirectory) return File(it) }
-    val sdkDir = props.getProperty("sdk.dir")?.let { if (File(it).isDirectory) File(it) }
-        ?: System.getenv("ANDROID_HOME")?.let { if (File(it).isDirectory) File(it) }
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { props.load(it) }
+    }
+    props.getProperty("ndk.dir")?.let { ndkDir ->
+        val dir = File(ndkDir)
+        if (dir.isDirectory) return dir
+    }
+    val sdkDir = sequenceOf(props.getProperty("sdk.dir"), System.getenv("ANDROID_HOME"))
+        .mapNotNull { path -> path?.let(::File)?.takeIf { it.isDirectory } }
+        .firstOrNull()
         ?: return null
     return sdkDir.resolve("ndk").listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.name }
 }
@@ -149,7 +158,7 @@ private fun resolveAniAndroidNdkDir(project: Project): File? {
  * 模块需包含 `src/androidMain/cpp` 下的源码 (见 [aniNativeAudioLibraries]).
  */
 fun Project.configureAniAudioNatives() {
-    if (findProperty("ani.audio.natives.skip")?.toBoolean() == true) {
+    if (findProperty("ani.audio.natives.skip")?.toString()?.toBoolean() == true) {
         logger.lifecycle("Skipping ani audio native builds: ani.audio.natives.skip=true")
         return
     }
