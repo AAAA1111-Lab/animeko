@@ -72,11 +72,12 @@ internal class AniRenderersFactory(
         )
     }
 
+    // Media3 的 buildAudioSink 返回可空 AudioSink (null 表示使用默认 sink), override 必须保持可空.
     override fun buildAudioSink(
         context: Context,
         enableFloatOutput: Boolean,
         enableAudioTrackPlaybackParams: Boolean,
-    ): AudioSink {
+    ): AudioSink? {
         if (!highQualityTimeStretch) {
             return super.buildAudioSink(context, enableFloatOutput, enableAudioTrackPlaybackParams)
         }
