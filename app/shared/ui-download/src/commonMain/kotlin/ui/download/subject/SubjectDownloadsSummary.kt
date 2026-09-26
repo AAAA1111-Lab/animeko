@@ -75,9 +75,10 @@ fun SubjectDownloadsSummaryRow(
         } else {
             downloadSummaryText(downloads, totalEpisodeCount)
         }
+        // 占满剩余宽度, 让右侧的"缓存全部弹幕"/"全部暂停"按钮始终右对齐; 过长时文本自行省略.
         Text(
             summaryText,
-            Modifier.weight(1f, fill = false).padding(vertical = 8.dp),
+            Modifier.weight(1f).padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
