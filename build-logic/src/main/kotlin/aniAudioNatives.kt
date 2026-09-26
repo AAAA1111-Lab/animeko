@@ -60,11 +60,13 @@ private val aniNativeAudioLibraries = listOf(
     ),
 )
 
+// NDK 的 per-ABI clang++ 包装器名称 = triple + min API level (如 aarch64-linux-android21-clang++),
+// 用 API 21 编出的产物向后兼容所有更高 minSdk.
 private val aniNativeAudioAbis = listOf(
-    "arm64-v8a" to "aarch64-linux-android",
-    "armeabi-v7a" to "armv7a-linux-androideabi",
-    "x86_64" to "x86_64-linux-android",
-    "x86" to "i686-linux-android",
+    "arm64-v8a" to "aarch64-linux-android21",
+    "armeabi-v7a" to "armv7a-linux-androideabi21",
+    "x86_64" to "x86_64-linux-android21",
+    "x86" to "i686-linux-android21",
 )
 
 /**
