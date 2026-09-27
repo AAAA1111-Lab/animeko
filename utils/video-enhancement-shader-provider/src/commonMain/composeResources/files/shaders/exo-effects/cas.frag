@@ -5,7 +5,7 @@ varying vec2 vTexSamplingCoord;
 uniform sampler2D uTexSampler;
 uniform vec2 uInputSize;
 
-const float SHARPNESS = 0.8;
+const float SHARPNESS = 0.6;
 
 void main() {
     vec2 step = 1.0 / uInputSize;
