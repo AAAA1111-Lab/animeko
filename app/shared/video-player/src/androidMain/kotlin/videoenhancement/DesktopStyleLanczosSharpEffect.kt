@@ -123,7 +123,7 @@ private class DesktopStyleLanczosSharpShaderProgram(
     override fun release() {
         try {
             copyProgram.delete()
-            if (lanczosProgram.isInitialized) lanczosProgram.value.delete()
+            if (lanczosProgram.isInitialized()) lanczosProgram.value.delete()
         } catch (e: GlUtil.GlException) {
             throw VideoFrameProcessingException(e)
         }

@@ -35,7 +35,6 @@ import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
 import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
 import me.him188.ani.app.data.repository.subject.OfflineSubjectDisplayInfo
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
-import me.him188.ani.app.data.repository.subject.staticSubjectImageLargeUrl
 import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
 import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.domain.media.download.DownloadOperation
