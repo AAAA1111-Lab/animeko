@@ -340,7 +340,7 @@ private fun DanmakuSourceChip(
                     size = 24,
                 )
             },
-            colors = if (sourceItem.enabled && sourceItem.isFuzzyMatch) {
+            colors = if (sourceItem.enabled && !sourceItem.isExactMatch) {
                 FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer,
