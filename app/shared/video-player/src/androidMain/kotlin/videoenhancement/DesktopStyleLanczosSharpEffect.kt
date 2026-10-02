@@ -28,6 +28,13 @@ import kotlin.math.roundToInt
  *
  * It uses mpv's Jinc radius and sharp blur, sigmoid upscaling, and 0.7 anti-ringing while
  * avoiding a second full-size intermediate texture on mobile GPUs.
+ *
+ * 视口尺寸在构图时传入; 输入(视频)尺寸由 Media3 在首帧前的 [configure][BaseGlShaderProgram.configure]
+ * 给出, 因此图层不需要控制器等待视频元数据. 是否真的启用 lanczos 也在 configure 里判定:
+ * 只有在"确实需要放大"且放大后的输出不超过 [MAX_ENHANCED_OUTPUT_PIXELS] 时才使用它
+ * (4K 屏上看 1080p, 输出约 830 万像素, 会直接跳过, 交给平台的硬件缩放完成剩余放大,
+ * 否则中端 GPU 例如骁龙 845 会持续掉帧); 其余情况走廉价的纹理拷贝直通,
+ * 避免按全分辨率跑每像素约 8x8 的邻域采样.
  */
 internal class DesktopStyleLanczosSharpEffect(
     private val viewportWidth: Int,
@@ -48,10 +55,11 @@ private class DesktopStyleLanczosSharpShaderProgram(
     /* useHighPrecisionColorComponents = */ false,
     /* texturePoolCapacity = */ 2,
 ) {
-    val shaderSources = LanczosSharpShaderSources(context)
+    private val shaderSources = LanczosSharpShaderSources(context)
 
-    private val program = try {
-        GlProgram(shaderSources.vertexShader, shaderSources.fragmentShader).also {
+    /** 不满足 lanczos 条件时的直通拷贝, 避免为永远用不到的 8x8 采样链路付出编译与运行成本. */
+    private val copyProgram = try {
+        GlProgram(shaderSources.vertexShader, COPY_FRAGMENT_SHADER).also {
             it.setBufferAttribute(
                 "aFramePosition",
                 GlUtil.getNormalizedCoordinateBounds(),
@@ -59,11 +67,26 @@ private class DesktopStyleLanczosSharpShaderProgram(
             )
         }
     } catch (e: GlUtil.GlException) {
-        throw VideoFrameProcessingException("Could not compile desktop-style Lanczos sharp effect", e)
+        throw VideoFrameProcessingException("Could not compile lanczos bypass copy effect", e)
+    }
+
+    private val lanczosProgram: Lazy<GlProgram> = lazy {
+        try {
+            GlProgram(shaderSources.vertexShader, shaderSources.fragmentShader).also {
+                it.setBufferAttribute(
+                    "aFramePosition",
+                    GlUtil.getNormalizedCoordinateBounds(),
+                    GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE,
+                )
+            }
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException("Could not compile desktop-style Lanczos sharp effect", e)
+        }
     }
 
     private var inputWidth = 0
     private var inputHeight = 0
+    private var bypass = true
 
     override fun configure(inputWidth: Int, inputHeight: Int): Size {
         this.inputWidth = inputWidth
@@ -72,20 +95,23 @@ private class DesktopStyleLanczosSharpShaderProgram(
             viewportWidth.toDouble() / inputWidth,
             viewportHeight.toDouble() / inputHeight,
         )
-        return Size(
-            (inputWidth * scale).roundToInt().coerceAtLeast(1),
-            (inputHeight * scale).roundToInt().coerceAtLeast(1),
-        )
+        val outputWidth = (inputWidth * scale).roundToInt().coerceAtLeast(1)
+        val outputHeight = (inputHeight * scale).roundToInt().coerceAtLeast(1)
+        bypass = scale <= 1.0 || outputWidth.toLong() * outputHeight > MAX_ENHANCED_OUTPUT_PIXELS
+        return if (bypass) Size(inputWidth, inputHeight) else Size(outputWidth, outputHeight)
     }
 
     override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
+        val program = if (bypass) copyProgram else lanczosProgram.value
         try {
             program.use()
             program.setSamplerTexIdUniform("uTexSampler", inputTexId, /* texUnitIndex = */ 0)
-            program.setFloatsUniform(
-                "uInputSize",
-                floatArrayOf(inputWidth.toFloat(), inputHeight.toFloat()),
-            )
+            if (!bypass) {
+                program.setFloatsUniform(
+                    "uInputSize",
+                    floatArrayOf(inputWidth.toFloat(), inputHeight.toFloat()),
+                )
+            }
             program.bindAttributesAndUniforms()
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4)
             GlUtil.checkGlError()
@@ -96,11 +122,27 @@ private class DesktopStyleLanczosSharpShaderProgram(
 
     override fun release() {
         try {
-            program.delete()
+            copyProgram.delete()
+            if (lanczosProgram.isInitialized) lanczosProgram.value.delete()
         } catch (e: GlUtil.GlException) {
-            throw VideoFrameProcessingException("Could not release desktop-style Lanczos sharp effect", e)
+            throw VideoFrameProcessingException(e)
         }
         super.release()
+    }
+
+    private companion object {
+        /** 1080p. 超过这个输出规模时, 增强链改由平台硬件缩放收尾. */
+        private const val MAX_ENHANCED_OUTPUT_PIXELS = 1920L * 1080L
+
+        private val COPY_FRAGMENT_SHADER = """
+            #version 100
+            precision mediump float;
+            varying vec2 vTexSamplingCoord;
+            uniform sampler2D uTexSampler;
+            void main() {
+                gl_FragColor = texture2D(uTexSampler, vTexSamplingCoord);
+            }
+        """.trimIndent()
     }
 }
 
