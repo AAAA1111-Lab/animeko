@@ -155,6 +155,7 @@ fun AniAppContent(aniNavigator: AniNavigator) {
                     viewModel = watchTogetherViewModel,
                     aniNavigator = aniNavigator,
                 )
+                PikPakNotEnoughSpaceDialogHost(aniAppViewModel.pikPakNotEnoughSpace)
             }
         }
     }
@@ -619,6 +620,7 @@ private fun AniAppContentImpl(
                             it.subjectId,
                             placeholder = SubjectDetailPlaceholder(
                                 id = it.subjectId,
+                                name = it.subjectOriginalTitle,
                                 nameCN = it.subjectTitle,
                                 coverUrl = it.imageUrl,
                             ),

@@ -243,6 +243,10 @@ fun Project.configureEncoding() {
 fun Project.configureKotlinTestSettings() {
     tasks.withType(Test::class).configureEach {
         useJUnitPlatform()
+        // CI 只有构建日志可看: 失败时要能直接看到断言消息, 而不只是异常类型与行号.
+        testLogging {
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
     }
 
     // 本项目的 JVM 测试统一使用 JUnit 5, 下面给各测试源集显式声明了 kotlin-test-junit5.
@@ -301,11 +305,10 @@ fun Project.configureKotlinTestSettings() {
                     }
                 }
 
-            sourceSets.matching { it.name == "commonTest" }.configureEach {
-                dependencies {
-                    implementation(kotlin("test-annotations-common"))?.because(b)
-                }
-            }
+            // 注意: 不要在这里给 commonTest 加 kotlin("test-annotations-common").
+            // 它会让 KGP 给 commonTest/androidDeviceTest 注入裸 kotlin-test 根依赖 (仅 IDE 解析路径),
+            // IDE sync 时与 JUnit 5 capability 冲突, 导致所有模块的 androidDeviceTest 报 "无法解析 kotlin-test".
+            // commonTest 的注解类由 :utils:testing 的 api(kotlin-test-annotations-common) 传递提供.
         }
     }
 }

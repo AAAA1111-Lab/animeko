@@ -34,6 +34,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.him188.ani.app.data.models.danmaku.DanmakuFilterConfig
+import me.him188.ani.app.data.models.preference.BackgroundBehavior
 import me.him188.ani.app.data.models.preference.DesktopCloseBehavior
 import me.him188.ani.app.data.models.preference.EpisodeListProgressTheme
 import me.him188.ani.app.data.models.preference.FullscreenSwitchMode
@@ -75,6 +76,9 @@ import me.him188.ani.app.ui.lang.settings_app_nsfw_content
 import me.him188.ani.app.ui.lang.settings_app_nsfw_display
 import me.him188.ani.app.ui.lang.settings_app_nsfw_hide
 import me.him188.ani.app.ui.lang.settings_app_search
+import me.him188.ani.app.ui.lang.settings_app_subject_title
+import me.him188.ani.app.ui.lang.settings_app_use_original_title
+import me.him188.ani.app.ui.lang.settings_app_use_original_title_description
 import me.him188.ani.app.ui.lang.settings_player
 import me.him188.ani.app.ui.lang.settings_player_audio_time_stretch
 import me.him188.ani.app.ui.lang.settings_player_audio_time_stretch_description
@@ -83,12 +87,17 @@ import me.him188.ani.app.ui.lang.settings_player_auto_mark_done
 import me.him188.ani.app.ui.lang.settings_player_auto_play_next
 import me.him188.ani.app.ui.lang.settings_player_auto_skip_op_ed
 import me.him188.ani.app.ui.lang.settings_player_auto_skip_op_ed_description
+import me.him188.ani.app.ui.lang.settings_player_background_behavior
+import me.him188.ani.app.ui.lang.settings_player_background_behavior_auto_pip
+import me.him188.ani.app.ui.lang.settings_player_background_behavior_background_playback
+import me.him188.ani.app.ui.lang.settings_player_background_behavior_description
+import me.him188.ani.app.ui.lang.settings_player_background_behavior_pause
 import me.him188.ani.app.ui.lang.settings_player_auto_switch_media_on_error
 import me.him188.ani.app.utils.formatSpeedValue
 import me.him188.ani.app.ui.lang.settings_player_default_playback_speed
 import me.him188.ani.app.ui.lang.settings_player_default_playback_speed_description
-import me.him188.ani.app.ui.lang.settings_player_experimental_hls_segment_filter
-import me.him188.ani.app.ui.lang.settings_player_experimental_hls_segment_filter_description
+import me.him188.ani.app.ui.lang.settings_player_hls_ad_filter
+import me.him188.ani.app.ui.lang.settings_player_hls_ad_filter_description
 import me.him188.ani.app.ui.lang.settings_player_enable_regex_filter
 import me.him188.ani.app.ui.lang.settings_player_frame_preview
 import me.him188.ani.app.ui.lang.settings_player_frame_preview_description
@@ -331,6 +340,21 @@ fun SettingsScope.AppearanceGroup(
             },
             title = { Text(stringResource(Lang.settings_app_episode_images)) },
             description = { Text(stringResource(Lang.settings_app_episode_images_description)) },
+        )
+    }
+
+    Group(title = { Text(stringResource(Lang.settings_app_subject_title)) }, useThinHeader = true) {
+        SwitchItem(
+            checked = uiSettings.subjectAppearance.useOriginalTitle,
+            onCheckedChange = {
+                state.update(
+                    uiSettings.copy(
+                        subjectAppearance = uiSettings.subjectAppearance.copy(useOriginalTitle = it),
+                    ),
+                )
+            },
+            title = { Text(stringResource(Lang.settings_app_use_original_title)) },
+            description = { Text(stringResource(Lang.settings_app_use_original_title_description)) },
         )
     }
 }
@@ -580,6 +604,38 @@ fun SettingsScope.PlayerGroup(
             },
             title = { Text(stringResource(Lang.settings_player_auto_play_next)) },
         )
+        if (LocalPlatform.current.isMobile()) {
+            HorizontalDividerItem()
+            DropdownItem(
+                selected = { config.backgroundBehavior },
+                // BACKGROUND_PLAYBACK 为二期后台播放预留, 暂不提供
+                values = {
+                    listOf(
+                        BackgroundBehavior.AUTO_PICTURE_IN_PICTURE,
+                        BackgroundBehavior.PAUSE,
+                    )
+                },
+                itemText = {
+                    Text(
+                        when (it) {
+                            BackgroundBehavior.AUTO_PICTURE_IN_PICTURE ->
+                                stringResource(Lang.settings_player_background_behavior_auto_pip)
+
+                            BackgroundBehavior.PAUSE ->
+                                stringResource(Lang.settings_player_background_behavior_pause)
+
+                            BackgroundBehavior.BACKGROUND_PLAYBACK ->
+                                stringResource(Lang.settings_player_background_behavior_background_playback)
+                        },
+                    )
+                },
+                onSelect = {
+                    videoScaffoldConfig.update(config.copy(backgroundBehavior = it))
+                },
+                title = { Text(stringResource(Lang.settings_player_background_behavior)) },
+                description = { Text(stringResource(Lang.settings_player_background_behavior_description)) },
+            )
+        }
         HorizontalDividerItem()
         SwitchItem(
             checked = config.autoSkipOpEd,
@@ -621,17 +677,14 @@ fun SettingsScope.PlayerGroup(
             )
         }
         HorizontalDividerItem()
-        if (!LocalPlatform.current.isIos()) {
-            SwitchItem(
-                checked = config.enableExperimentalHlsSegmentFiltering,
-                onCheckedChange = {
-                    videoScaffoldConfig.update(config.copy(enableExperimentalHlsSegmentFiltering = it))
-                },
-                title = { Text(stringResource(Lang.settings_player_experimental_hls_segment_filter)) },
-                description = { Text(stringResource(Lang.settings_player_experimental_hls_segment_filter_description)) },
-            )
-            HorizontalDividerItem()
-        }
+        SwitchItem(
+            checked = config.enableHlsAdFiltering,
+            onCheckedChange = {
+                videoScaffoldConfig.update(config.copy(enableHlsAdFiltering = it))
+            },
+            title = { Text(stringResource(Lang.settings_player_hls_ad_filter)) },
+            description = { Text(stringResource(Lang.settings_player_hls_ad_filter_description)) },
+        )
         HorizontalDividerItem()
         SwitchItem(
             checked = config.enableFramePreview,

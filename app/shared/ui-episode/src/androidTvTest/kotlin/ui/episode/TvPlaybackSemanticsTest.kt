@@ -43,7 +43,7 @@ class TvPlaybackSemanticsTest {
 
     @Test
     fun loadingIndicatorRemainsAvailableAfterResolutionForBufferingAndPlayerErrors() {
-        val loaded = VideoLoadingState.Succeed(false)
+        val loaded = VideoLoadingState.Succeed(null)
         assertFalse(shouldShowVideoLoadingIndicator(loaded, buffering = false, playerError = false))
         assertTrue(shouldShowVideoLoadingIndicator(loaded, buffering = true, playerError = false))
         assertTrue(shouldShowVideoLoadingIndicator(loaded, buffering = false, playerError = true))
@@ -118,5 +118,6 @@ class TvPlaybackSemanticsTest {
     private fun watching() = AniWatchTogetherWatchingInfo(
         subjectId = 1, episodeId = 2, subjectName = "番剧", episodeSort = "2", episodeName = "第二集",
         positionMillis = 20_000, positionAtMillis = 10_000, durationMillis = 60_000, paused = false,
+        buffering = false, loading = false, playbackRate = 1f,
     )
 }

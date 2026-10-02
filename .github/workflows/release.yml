@@ -65,7 +65,6 @@ jobs:
         GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}'
         GITHUB_REPOSITORY: '${{ github.repository }}'
-        CODEX_MODEL: 'gpt-5.5'
         GIT_TAG: '${{ steps.step-1.outputs.tag }}'
         TAG_VERSION: '${{ steps.step-2.outputs.substring }}'
       run: |-
@@ -139,7 +138,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-6'
       name: 'Get JBR (Windows)'
       env:
@@ -218,7 +217,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-15'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -332,7 +331,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-6'
       name: 'Setup Android SDK'
       uses: 'android-actions/setup-android@v3'
@@ -417,7 +416,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-16'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -536,7 +535,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-6'
       name: 'Update JVM args in gradle.properties'
       run: |-
@@ -697,7 +696,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-20'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -1103,7 +1102,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-7'
       name: 'Resolve JBR location'
       shell: 'bash'
@@ -1250,7 +1249,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-19'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -1358,7 +1357,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-7'
       name: 'Resolve JBR location'
       shell: 'bash'
@@ -1505,7 +1504,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-19'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -1622,7 +1621,7 @@ jobs:
         echo "ani.enable.firebase=true" >> local.properties
         echo "firebase.ga.app.id=${{ secrets.FIREBASE_GA_APP_ID }}" >> local.properties
         echo "firebase.ga.api.secret=${{ secrets.FIREBASE_GA_API_SECRET }}" >> local.properties
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-8'
       name: 'Get JBR (Windows)'
       env:
@@ -1703,7 +1702,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-18'
       name: 'Prepare google-services.json'
       env:
@@ -1725,7 +1724,7 @@ jobs:
         fi
         chmod 600 "$FILE_PATH"
         echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-19'
       name: 'Compile Kotlin (Attempt #1)'
       continue-on-error: true
@@ -1884,7 +1883,7 @@ jobs:
       continue-on-error: true
       timeout-minutes: 180
       run: './gradlew assembleDefaultRelease assembleTvRelease "--scan" "-Porg.gradle.daemon.idletimeout=60000" "-Dfile.encoding=UTF-8" "-Dorg.gradle.jvmargs=-Xmx8g -Dkotlin.daemon.jvm.options=-Xmx6g" "-Dkotlin.daemon.jvm.options=-Xmx6g"'
-      if: '${{ (github.repository == ''open-ani/animeko'') && (!(github.event_name == ''pull_request'')) }}'
+      if: '${{ (github.repository == ''open-ani/animeko'') && ((!(github.event_name == ''pull_request'')) || (github.event.pull_request.head.repo.full_name == github.repository)) }}'
     - id: 'step-40'
       name: 'Build Android Release APKs (Attempt #2)'
       env:

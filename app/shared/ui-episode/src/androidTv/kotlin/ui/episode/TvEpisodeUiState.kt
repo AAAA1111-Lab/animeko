@@ -9,12 +9,15 @@
 
 package me.him188.ani.tv.ui.episode
 
+import me.him188.ani.app.domain.episode.EpisodeCollections
 import me.him188.ani.app.domain.episode.SubjectRecommendation
+import me.him188.ani.app.domain.media.player.MediaCacheProgressInfo
 import me.him188.ani.app.domain.player.VideoLoadingState
 import me.him188.ani.app.videoplayer.videoenhancement.VideoEnhancementMode
 import me.him188.ani.danmaku.api.DanmakuServiceId
 import me.him188.ani.danmaku.api.provider.DanmakuProviderId
 import me.him188.ani.danmaku.ui.DanmakuPresentation
+import me.him188.ani.datasources.api.EpisodeType
 import me.him188.ani.datasources.api.Media
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
 import me.him188.ani.tv.ui.episode.danmaku.TvDanmakuMatchState
@@ -37,6 +40,7 @@ data class TvStripEpisode(
     val watched: Boolean,
     val stillUrl: String? = null,
     val isKnownBroadcast: Boolean = false,
+    val type: EpisodeType? = EpisodeType.MainStory,
 )
 
 data class TvPlayerPanelState(
@@ -53,7 +57,7 @@ data class TvEpisodeUiState(
     val mediaLabel: String? = null,
     val durationMillis: Long = 0,
     val positionMillis: Long = 0,
-    val bufferedFraction: Float = 0f,
+    val cacheProgress: MediaCacheProgressInfo? = null,
     val playbackSpeed: Float = 1f,
     val aspectRatioMode: AspectRatioMode = AspectRatioMode.FIT,
     val episodes: List<TvStripEpisode> = emptyList(),
@@ -66,10 +70,8 @@ data class TvEpisodeUiState(
     val danmakuMatch: TvDanmakuMatchState = TvDanmakuMatchState(),
 ) {
     val hasNextEpisode: Boolean
-        get() {
-            val index = episodes.indexOfFirst { it.episodeId == currentEpisodeId }
-            return index >= 0 && episodes.getOrNull(index + 1)?.isKnownBroadcast == true
-        }
+        get() = EpisodeCollections.findNeighborEpisode(episodes, currentEpisodeId, offset = 1, { it.episodeId }, { it.type })
+            ?.isKnownBroadcast == true
 }
 
 sealed interface TvEpisodeIntent {
