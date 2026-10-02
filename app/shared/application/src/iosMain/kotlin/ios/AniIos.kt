@@ -27,19 +27,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.SystemFileSystem
-import me.him188.ani.app.data.models.preference.PikPakConfig
 import me.him188.ani.app.data.persistent.database.AniDatabase
 import me.him188.ani.app.data.repository.user.SettingsRepository
 import me.him188.ani.app.data.repository.user.UserRepository
 import me.him188.ani.app.domain.foundation.HttpClientProvider
-import me.him188.ani.app.domain.foundation.ScopedHttpClientUserAgent
 import me.him188.ani.app.domain.foundation.get
 import me.him188.ani.app.domain.media.cache.engine.AlwaysUseTorrentEngineAccess
 import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
@@ -53,13 +49,12 @@ import me.him188.ani.app.domain.media.resolver.HttpStreamingMediaResolver
 import me.him188.ani.app.domain.media.resolver.IosWebMediaResolver
 import me.him188.ani.app.domain.media.resolver.LocalFileUriMediaResolver
 import me.him188.ani.app.domain.media.resolver.MediaResolver
-import me.him188.ani.app.domain.media.resolver.OfflineDownloadMediaResolver
-import me.him188.ani.app.domain.media.resolver.TorrentMediaResolver
 import me.him188.ani.app.domain.mediasource.web.captcha.CaptchaBrowserFactory
 import me.him188.ani.app.domain.mediasource.web.captcha.ImageCaptchaRecognizer
 import me.him188.ani.app.domain.mediasource.web.captcha.UnsupportedCaptchaBrowserFactory
 import me.him188.ani.app.domain.torrent.DefaultTorrentManager
 import me.him188.ani.app.domain.torrent.TorrentManager
+import me.him188.ani.app.domain.torrent.engines.PikPakEngine
 import me.him188.ani.app.data.repository.user.QrLoginRepository
 import me.him188.ani.app.navigation.AniNavigator
 import me.him188.ani.app.navigation.BrowserNavigator
@@ -78,6 +73,7 @@ import me.him188.ani.app.platform.createAppRootCoroutineScope
 import me.him188.ani.app.platform.getCommonKoinModule
 import me.him188.ani.app.platform.rememberPlatformWindow
 import me.him188.ani.app.platform.startCommonKoinModule
+import me.him188.ani.app.platform.torrentMediaResolvers
 import me.him188.ani.app.platform.trace.recordAppStart
 import me.him188.ani.app.tools.update.IosUpdateInstaller
 import me.him188.ani.app.tools.update.UpdateInstaller
@@ -92,10 +88,6 @@ import me.him188.ani.app.ui.foundation.widgets.Toaster
 import me.him188.ani.app.ui.main.AniApp
 import me.him188.ani.app.ui.main.AniAppContent
 import me.him188.ani.app.videoplayer.player.AniAVKitMediampPlayerFactory
-import me.him188.ani.torrent.offline.OfflineDownloadEngine
-import me.him188.ani.torrent.pikpak.PikPakCredentials
-import me.him188.ani.torrent.pikpak.PikPakOfflineDownloadEngine
-import me.him188.ani.torrent.pikpak.PikPakSessionStoreAdapter
 import me.him188.ani.utils.analytics.Analytics
 import me.him188.ani.utils.httpdownloader.HttpDownloader
 import me.him188.ani.utils.io.SystemCacheDir
@@ -105,17 +97,26 @@ import me.him188.ani.utils.io.absolutePath
 import me.him188.ani.utils.io.createDirectories
 import me.him188.ani.utils.io.resolve
 import me.him188.ani.utils.logging.IosLoggingConfigurator
+import me.him188.ani.utils.logging.error
+import me.him188.ani.utils.logging.logger
 import me.him188.ani.utils.platform.annotations.TestOnly
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 import org.openani.mediamp.MediampPlayerFactory
 import org.openani.mediamp.ffmpeg.FFmpegKit
+import platform.AVFAudio.AVAudioSession
+import platform.AVFAudio.AVAudioSessionCategoryPlayback
+import platform.AVFAudio.setActive
 import platform.Foundation.NSBundle
 import platform.Foundation.NSFileManager
 import platform.UIKit.NSLayoutConstraint
 import platform.UIKit.UIViewController
 import platform.UIKit.addChildViewController
 import platform.UIKit.didMoveToParentViewController
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.getUnhandledExceptionHook
+import kotlin.native.setUnhandledExceptionHook
+import kotlin.native.terminateWithUnhandledException
 
 class AniIosApplication(
     val context: IosContext,
@@ -159,7 +160,18 @@ fun startIosApp(): AniIosApplication {
 
     AppStartupTasks.printVersions()
     IosLoggingConfigurator.configure(context.files.logsDir.path, SystemFileSystem)
+    installUnhandledExceptionHook()
     initializeIosFfmpegRuntime()
+
+    // 画中画/后台播放需要 playback 音频会话, 必须在任何播放开始前激活.
+    // (原为音量管理器 IosAudioManager 的懒加载副作用, 时序不可靠)
+    @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+    fun activateAudioSession() {
+        val session = AVAudioSession.sharedInstance()
+        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
+        session.setActive(true, withOptions = 0uL, error = null)
+    }
+    activateAudioSession()
     startupTimeMonitor.mark(StepName.Logging)
 
     val koin = startKoin {
@@ -217,6 +229,30 @@ fun startIosApp(): AniIosApplication {
         onBackPressedDispatcherOwner = onBackPressedDispatcherOwner,
         scope = scope,
     )
+}
+
+private val uncaughtExceptionLogger = logger("AniIos")
+
+/**
+ * Kotlin/Native aborts the process on an uncaught exception without going through our logger,
+ * so the file log would end right before the most useful line. Log it and flush first.
+ */
+@OptIn(ExperimentalNativeApi::class)
+private fun installUnhandledExceptionHook() {
+    val previous = getUnhandledExceptionHook()
+    setUnhandledExceptionHook { throwable ->
+        try {
+            uncaughtExceptionLogger.error(throwable) { "Uncaught Kotlin exception, terminating" }
+            IosLoggingConfigurator.flush()
+        } catch (_: Throwable) {
+            // Never let logging failures hide the original exception.
+        }
+        if (previous != null) {
+            previous(throwable)
+        } else {
+            terminateWithUnhandledException(throwable)
+        }
+    }
 }
 
 private fun initializeIosFfmpegRuntime() {
@@ -318,6 +354,7 @@ fun getIosModules(
             subscriptionRepository = get(),
             meteredNetworkDetector = get(),
             baseSaveDir = { defaultTorrentCacheDir },
+            pikpak = get<PikPakEngine>(),
         )
     }
     single<HttpMediaCacheEngine> {
@@ -342,50 +379,9 @@ fun getIosModules(
         }
     }
 
-
-    single<OfflineDownloadEngine> {
-        val settings = get<SettingsRepository>()
-        val configState = settings.pikpakConfig.flow
-            .stateIn(coroutineScope, SharingStarted.Eagerly, initialValue = PikPakConfig.Default)
-        val credentialsFlow = configState
-            .map { cfg ->
-                if (cfg.enabled && cfg.username.isNotEmpty() &&
-                    (cfg.password.isNotEmpty() || cfg.refreshToken.isNotEmpty())
-                ) {
-                    PikPakCredentials(cfg.username, cfg.password)
-                } else null
-            }
-            .stateIn(coroutineScope, SharingStarted.Eagerly, initialValue = null)
-        val sessionStore = PikPakSessionStoreAdapter(
-            readRefreshToken = { configState.value.refreshToken },
-            writeRefreshToken = { rt ->
-                settings.pikpakConfig.update { copy(refreshToken = rt) }
-            },
-            // PikPakConfig.password stays on disk obscured (AES-CTR with a
-            // hardcoded key, the same approach as `rclone obscure`; see
-            // ObscuredStringSerializer). We need to keep it because a
-            // server-side revoke of the refresh token would otherwise leave
-            // the engine with no recovery path — Test and playback would
-            // silently fail until the user re-typed the password.
-            // PikPakAcceleratorGroup never echoes the stored value back to
-            // the password field, so the obscured copy is what the eyedrop
-            // attacker would see.
-            onSessionSaved = {},
-        )
-        PikPakOfflineDownloadEngine(
-            scopedHttpClient = get<HttpClientProvider>().get(ScopedHttpClientUserAgent.ANI),
-            credentials = credentialsFlow,
-            scope = coroutineScope,
-            sessionStore = sessionStore,
-            slotQueueLength = { configState.value.slotQueueLength },
-        )
-    }
     factory<MediaResolver> {
-        val torrentResolvers = get<TorrentManager>().engines.map { TorrentMediaResolver(it, get()) }
-        val btFallback = MediaResolver.from(torrentResolvers)
         MediaResolver.from(
-            listOf<MediaResolver>(OfflineDownloadMediaResolver(get(), fallback = btFallback))
-                .plus(torrentResolvers)
+            torrentMediaResolvers(get<TorrentManager>().engines, get())
                 .plus(LocalFileUriMediaResolver())
                 .plus(HttpStreamingMediaResolver())
                 .plus(

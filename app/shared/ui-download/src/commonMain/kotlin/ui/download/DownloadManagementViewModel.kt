@@ -127,7 +127,7 @@ class DownloadManagementViewModel(
                 subjectName = subject?.info?.displayName ?: entries.first().subjectName,
                 entries = entries,
                 collectionType = subject?.type,
-                imageUrl = subject?.info?.imageLarge ?: staticSubjectImageLargeUrl(subjectId),
+                imageUrl = subject?.info?.imageThumb,
                 totalEpisodeCount = subject?.info?.totalEpisodes?.takeIf { it > 0 },
             )
         }.sortedWith(

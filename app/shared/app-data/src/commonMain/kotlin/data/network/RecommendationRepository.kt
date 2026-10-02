@@ -73,7 +73,8 @@ class RecommendationRepository(
         if (!uri.isNullOrBlank()) return null
         return RecommendedSubjectInfo(
             bangumiId = id,
-            nameCn = subjectNameCn.ifEmpty { subjectName },
+            nameCn = subjectNameCn,
+            name = subjectName,
             imageLarge = imageUrl,
         )
     }
