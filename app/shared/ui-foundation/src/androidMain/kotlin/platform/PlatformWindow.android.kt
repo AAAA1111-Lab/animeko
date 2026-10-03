@@ -43,7 +43,9 @@ actual class PlatformWindow(
     private var _isUndecoratedFullscreen: Boolean by mutableStateOf(initialUndecoratedFullscreen)
     actual val isUndecoratedFullscreen: Boolean get() = _isUndecoratedFullscreen
 
-    private val insetListener = View.OnApplyWindowInsetsListener { _, insets ->
+    private val insetListener = View.OnApplyWindowInsetsListener(::applyWindowInsets)
+
+    internal fun applyWindowInsets(view: View, insets: WindowInsets): WindowInsets {
         @Suppress("DEPRECATION")
         val isFullscreenNow = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
@@ -60,7 +62,8 @@ actual class PlatformWindow(
             _isUndecoratedFullscreen = isFullscreenNow
         }
 
-        insets
+        // DecorView 负责更新系统栏背景和内容边距; 监听器保留它的处理及消耗结果.
+        return view.onApplyWindowInsets(insets)
     }
 
     private val configurationListener = object : ComponentCallbacks {
@@ -80,9 +83,8 @@ actual class PlatformWindow(
             decorView?.setOnApplyWindowInsetsListener(insetListener)
         } else if (decorView != null) {
             ViewCompat.setOnApplyWindowInsetsListener(decorView) { v, insets ->
-                val toWindowInsets = insets.toWindowInsets()!!
-                insetListener.onApplyWindowInsets(v, toWindowInsets)
-                WindowInsetsCompat.toWindowInsetsCompat(toWindowInsets)
+                val appliedInsets = insetListener.onApplyWindowInsets(v, insets.toWindowInsets()!!)
+                WindowInsetsCompat.toWindowInsetsCompat(appliedInsets, v)
             }
         }
 

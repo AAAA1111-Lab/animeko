@@ -10,7 +10,11 @@
 package me.him188.ani.app.ui.foundation.layout
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Build
+import android.view.WindowManager
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -26,22 +30,22 @@ actual suspend fun Context.setRequestFullScreen(window: PlatformWindowMP, fullsc
     if (this is Activity) {
         if (fullscreen) {
             // go landscape
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
             // keep screen on
-            this.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            this.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             // cancel landscape
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
 
             // don't keep screen on
-            this.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            this.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     } else {
         val orientation = if (fullscreen) {
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            Configuration.ORIENTATION_LANDSCAPE
         } else {
-            android.content.res.Configuration.ORIENTATION_PORTRAIT
+            Configuration.ORIENTATION_PORTRAIT
         }
         resources.configuration.orientation = orientation
     }
@@ -53,19 +57,21 @@ actual fun Context.setSystemBarVisible(window: PlatformWindowMP, visible: Boolea
     val insetsController = WindowCompat.getInsetsController(this.window, this.window.decorView)
     val bitmask = WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars()
 
+    WindowCompat.setDecorFitsSystemWindows(this.window, false)
     if (visible) {
-        insetsController.show(bitmask)
         insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_BARS_BY_TOUCH
+        insetsController.show(bitmask)
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             @Suppress("DEPRECATION")
-            this.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            this.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         }
     } else {
-        insetsController.hide(bitmask)
         insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.hide(bitmask)
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             @Suppress("DEPRECATION")
-            this.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            this.window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         }
     }
+    ViewCompat.requestApplyInsets(this.window.decorView)
 }
