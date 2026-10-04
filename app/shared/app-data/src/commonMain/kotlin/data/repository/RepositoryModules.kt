@@ -162,6 +162,7 @@ fun KoinApplication.repositoryModules(
         SubjectSearchRepository(
             aniSubjectSearchService = get(),
             subjectCollectionRepository = get(),
+            bangumiSearchService = get(),
         )
     }
 
@@ -169,6 +170,7 @@ fun KoinApplication.repositoryModules(
         SubjectSearchCompletionRepository(
             aniSubjectSearchService = get(),
             subjectCollectionRepository = get(),
+            bangumiSearchService = get(),
             settingsRepository = get(),
         )
     }

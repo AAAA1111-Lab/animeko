@@ -28,7 +28,7 @@ fun SubjectDownloadsScreen(
     navigationIcon: @Composable () -> Unit = {},
 ) {
     val selection = rememberDownloadSelectionState()
-    SubjectDownloadsHost(vm.presenter) { state, actions, sourceInfo ->
+    SubjectDownloadsHost(vm.presenter) { state, actions, sourceInfo, danmaku ->
         SubjectDownloadsPage(
             state = state,
             selection = selection,
@@ -39,6 +39,7 @@ fun SubjectDownloadsScreen(
             modifier = modifier,
             windowInsets = windowInsets,
             navigationIcon = navigationIcon,
+            danmaku = danmaku,
         )
     }
 }

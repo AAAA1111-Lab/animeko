@@ -44,8 +44,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import me.him188.ani.app.tools.getOrZero
-import me.him188.ani.app.ui.download.DownloadActionDropdown
 import me.him188.ani.app.ui.download.DeleteActionDialog
+import me.him188.ani.app.ui.download.DownloadActionDropdown
+import me.him188.ani.app.ui.download.deleteConfirmationKind
 import me.him188.ani.app.ui.foundation.animation.AniAnimatedVisibility
 import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
@@ -99,6 +100,7 @@ fun DownloadRow(
     if (showConfirmDelete) {
         DeleteActionDialog(
             onDismiss = { showConfirmDelete = false },
+            confirmationKind = listOf(episode).deleteConfirmationKind(),
             confirmEnabled = !episode.isBusy,
             onConfirm = {
                 onDelete()

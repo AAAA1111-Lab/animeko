@@ -69,6 +69,8 @@ internal class ExoPlayerVideoEnhancementController(
 
         // The shader receives input dimensions in configure(). Metadata availability must not
         // rebuild the effect graph: compiling the quality shaders can stall playback.
+        // DesktopStyleLanczosSharpEffect 同样在 configure() 里自适应输入尺寸 (含放大预算判定),
+        // 因此效果图只依赖视口, 视频元数据到达时不再触发整链重建.
         val shouldApplyScaler = viewportSize != null
         if (
             appliedMode == mode && scalerApplied == shouldApplyScaler &&
@@ -79,6 +81,7 @@ internal class ExoPlayerVideoEnhancementController(
             buildList {
                 when (mode) {
                     VideoEnhancementMode.OFF -> Unit
+                    VideoEnhancementMode.FAST -> add(ContrastAdaptiveSharpenEffect)
                     VideoEnhancementMode.PERFORMANCE -> add(Anime4kRestoreEffect)
                     VideoEnhancementMode.QUALITY -> {
                         add(Anime4kRestoreQualityEffect)
@@ -92,8 +95,8 @@ internal class ExoPlayerVideoEnhancementController(
         )
         appliedMode = mode
         scalerApplied = shouldApplyScaler
-        appliedWidth = if (shouldApplyScaler) viewportSize.width else 0
-        appliedHeight = if (shouldApplyScaler) viewportSize.height else 0
+        appliedWidth = viewportSize?.width ?: 0
+        appliedHeight = viewportSize?.height ?: 0
     }
 
     override fun restore() {

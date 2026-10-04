@@ -40,8 +40,16 @@ class JellyfinMediaSource(
     }
 
     object Parameters : MediaSourceParametersBuilder() {
+        val name = string(
+            "name",
+            label = "名称",
+            defaultProvider = { "Jellyfin" },
+            description = "自定义此 Jellyfin 数据源的显示名称",
+            validate = { it.isNotBlank() },
+        )
         val baseUrl = string(
             "baseUrl",
+            label = "服务器地址",
             defaultProvider = { "http://localhost:8096" },
             description = "服务器地址\n示例: http://localhost:8096",
         )
@@ -51,14 +59,17 @@ class JellyfinMediaSource(
             AUTH_MODE_USERNAME_PASSWORD,
             default = AUTH_MODE_API_KEY,
             description = "认证方式: apiKey 使用 User ID 与 API Key; usernamePassword 使用用户名与密码登录",
+            label = "认证方式",
         )
         val userId = string(
             "userId",
+            label = "User ID",
             description = "仅 API Key 模式使用。可在 Jellyfin \"控制台 - 用户\" 中选择一个用户, 在浏览器地址栏找到 \"userId=\" 后面的内容",
             visibleWhen = authMode.hasValue(AUTH_MODE_API_KEY),
         )
         val apikey = string(
             "apikey",
+            label = "API Key",
             description = "仅 API Key 模式使用。可在 Jellyfin \"控制台 - API 秘钥\" 中添加",
             visibleWhen = authMode.hasValue(AUTH_MODE_API_KEY),
         )
@@ -69,11 +80,13 @@ class JellyfinMediaSource(
         // Code handling logs, exports, or diagnostics must redact both secrets.
         val username = string(
             "username",
+            label = "用户名",
             description = "仅用户名密码模式使用",
             visibleWhen = authMode.hasValue(AUTH_MODE_USERNAME_PASSWORD),
         )
         val password = string(
             "password",
+            label = "密码",
             description = "仅用户名密码模式使用",
             visibleWhen = authMode.hasValue(AUTH_MODE_USERNAME_PASSWORD),
         )
@@ -93,8 +106,9 @@ class JellyfinMediaSource(
     }
 
     override val kind: MediaSourceKind get() = MediaSourceKind.WEB
-    override val info: MediaSourceInfo = INFO
-    override val mediaSourceId: String get() = ID
+    override val info: MediaSourceInfo =
+        config[Parameters.name].trim().takeIf { it.isNotEmpty() }?.let { INFO.copy(displayName = it) } ?: INFO
+    override val mediaSourceId: String = instanceId
     override val baseUrl = config[Parameters.baseUrl].removeSuffix("/")
     private val authMode = config[Parameters.authMode]
     private val userId = config[Parameters.userId]

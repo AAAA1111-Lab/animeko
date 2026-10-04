@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,8 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheState
 import me.him188.ani.app.ui.download.components.DownloadItem
 import me.him188.ani.app.ui.lang.Lang
+import me.him188.ani.app.ui.lang.cache_danmaku_all_action
+import me.him188.ani.app.ui.lang.cache_danmaku_all_complete
+import me.him188.ani.app.ui.lang.cache_danmaku_all_progress
 import me.him188.ani.app.ui.lang.cache_management_downloading_count
 import me.him188.ani.app.ui.lang.cache_management_finished_count
 import me.him188.ani.app.ui.lang.cache_management_selection_downloading_count
@@ -39,6 +45,9 @@ object SubjectDownloadsTestTags {
     const val PAUSE_ALL = "subject_downloads_pause_all"
     const val RESUME_ALL = "subject_downloads_resume_all"
     const val LOADING = "subject_downloads_loading"
+
+    /** 剧集行上的"弹幕 N"标记, 供 UI 测试断言每集的弹幕缓存状态. */
+    const val DANMAKU_CACHED_BADGE = "subject_downloads_danmaku_cached_badge"
 }
 
 @Composable
@@ -50,6 +59,9 @@ fun SubjectDownloadsSummaryRow(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    danmakuBatchState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
+    missingDanmakuEpisodeCount: Int = 0,
+    onCacheAllDanmaku: (() -> Unit)? = null,
 ) {
     Row(
         modifier
@@ -63,9 +75,10 @@ fun SubjectDownloadsSummaryRow(
         } else {
             downloadSummaryText(downloads, totalEpisodeCount)
         }
+        // 占满剩余宽度, 让右侧的"缓存全部弹幕"/"全部暂停"按钮始终右对齐; 过长时文本自行省略.
         Text(
             summaryText,
-            Modifier.weight(1f, fill = false).padding(vertical = 8.dp),
+            Modifier.weight(1f).padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -73,6 +86,9 @@ fun SubjectDownloadsSummaryRow(
         )
 
         if (!inSelection) {
+            if (onCacheAllDanmaku != null) {
+                DanmakuCacheAllButton(danmakuBatchState, missingDanmakuEpisodeCount, onCacheAllDanmaku)
+            }
             PauseOrResumeAllTextButton(downloads, onPauseAll, onResumeAll)
         }
     }
@@ -160,6 +176,9 @@ fun SubjectDownloadsHeader(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    danmakuBatchState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
+    missingDanmakuEpisodeCount: Int = 0,
+    onCacheAllDanmaku: (() -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -186,6 +205,51 @@ fun SubjectDownloadsHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (onCacheAllDanmaku != null) {
+            DanmakuCacheAllButton(danmakuBatchState, missingDanmakuEpisodeCount, onCacheAllDanmaku)
+        }
         PauseOrResumeAllTextButton(downloads, onPauseAll, onResumeAll)
+    }
+}
+
+/**
+ * "缓存全部弹幕" 入口.
+ *
+ * 三种状态: 运行中显示进度; 该条目每一集都已有弹幕时显示已完成且不可点 (否则点了看起来没反应);
+ * 其余情况可点, 只缓存缺失的剧集.
+ */
+@Composable
+private fun DanmakuCacheAllButton(
+    state: DanmakuBatchCacheState,
+    missingEpisodeCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        state.isRunning -> Row(
+            modifier.padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Text(
+                stringResource(Lang.cache_danmaku_all_progress, state.done, state.total),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+
+        missingEpisodeCount == 0 -> Text(
+            stringResource(Lang.cache_danmaku_all_complete),
+            modifier.padding(start = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+
+        else -> TextButton(onClick = onClick, modifier = modifier.padding(start = 4.dp)) {
+            Text(stringResource(Lang.cache_danmaku_all_action), maxLines = 1)
+        }
     }
 }

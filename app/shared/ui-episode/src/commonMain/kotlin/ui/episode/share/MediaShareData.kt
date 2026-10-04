@@ -30,7 +30,15 @@ data class MediaShareData(
         ): MediaShareData {
             val realDownload = when (mediaData) {
                 is UriMediaData -> {
-                    ResourceLocation.HttpStreamingFile(mediaData.uri)
+                    // 本地导入的媒体在 Android 上是 SAF `content://` URI, 也允许 `file://`.
+                    // 这类地址不是流式链接, 必须走 [ResourceLocation.LocalFile] ——
+                    // [ResourceLocation.HttpStreamingFile] 会在构造时拒绝它们并抛异常.
+                    // (播放期间每条 pageState 都会走到这里, 所以用错类型会让整个页面挂掉.)
+                    if (mediaData.uri.isLocalContentUri()) {
+                        ResourceLocation.LocalFile(mediaData.uri)
+                    } else {
+                        ResourceLocation.HttpStreamingFile(mediaData.uri)
+                    }
                 }
 
                 is TorrentMediaData,
@@ -44,6 +52,11 @@ data class MediaShareData(
                 websiteUrl = media?.originalUrl,
                 download = realDownload,
             )
+        }
+
+        private fun String.isLocalContentUri(): Boolean {
+            val scheme = substringBefore(':', missingDelimiterValue = "").lowercase()
+            return scheme == "content" || scheme == "file"
         }
     }
 }

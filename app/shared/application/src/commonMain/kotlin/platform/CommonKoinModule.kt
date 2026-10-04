@@ -34,6 +34,7 @@ import me.him188.ani.app.data.network.AniEpisodeCommentService
 import me.him188.ani.app.data.network.AniPersonCommentService
 import me.him188.ani.app.data.network.AniSubjectRelationIndexService
 import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.AnimeScheduleService
 import me.him188.ani.app.data.network.BangumiSummaryService
 import me.him188.ani.app.data.network.BangumiBangumiCommentServiceImpl
@@ -58,6 +59,7 @@ import me.him188.ani.app.data.repository.repositoryModules
 import me.him188.ani.app.data.repository.torrent.peer.PeerFilterSubscriptionRepository
 import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.SettingsRepository
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
 import me.him188.ani.app.domain.torrent.TorrentEngineType
 import me.him188.ani.app.domain.torrent.engines.PikPakEngine
 import me.him188.ani.torrent.pikpak.PikPakCredentials
@@ -98,8 +100,13 @@ import me.him188.ani.app.domain.mediasource.web.captcha.MacCmsImageCaptchaSolver
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSessionManager
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceCookieJar
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistry
+import me.him188.ani.app.domain.media.cache.MediaCacheManager
+import me.him188.ani.app.domain.media.cache.MediaCacheManagerImpl
 import me.him188.ani.app.domain.media.cache.PikPakWebM3uCacheMigration
 import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.createLocalImportFileAccess
+import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.cache.engine.KtorPersistentHttpDownloader
 import me.him188.ani.app.domain.media.cache.engine.AlwaysUseTorrentEngineAccess
 import me.him188.ani.app.domain.media.cache.engine.MediaCacheEngineKey
@@ -280,6 +287,11 @@ private fun KoinApplication.otherModules(
             subjectApi = aniApiProvider.subjectApi,
         )
     }
+    single {
+        BangumiSearchService(
+            client = get<HttpClientProvider>().get(),
+        )
+    }
 
     // Data layer network services
     single<SubjectService> {
@@ -325,6 +337,15 @@ private fun KoinApplication.otherModules(
     // TV 横版 backdrop / 分集剧照; 未配置 ani.tmdb.api.token 时自动关闭
     single<BangumiSummaryService> { BangumiSummaryService(get()) }
 
+    // 应用级单例: 批量缓存弹幕必须在离开条目缓存页后继续跑, 因此它的作用域不能是页面的 ViewModel.
+    single<DanmakuBatchCacheManager> {
+        DanmakuBatchCacheManager(
+            applicationScope = coroutineScope,
+            danmakuRepository = get(),
+            subjectCollectionRepository = get(),
+            episodeCollectionRepository = get(),
+        )
+    }
     single<UpdateManager> {
         UpdateManager(
             // Android FileProvider 共享整个 updates/ 目录, 见 file_paths.xml
@@ -402,26 +423,40 @@ private fun KoinApplication.otherModules(
             )
         }
 
-        single<MediaDownloadManager> {
-            val id = MediaDownloadManager.LOCAL_FS_MEDIA_SOURCE_ID
+        single<LocalImportMediaCacheStorage> {
+            val metadataStore = getContext().dataStores.mediaCacheMetadataStore
+            LocalImportMediaCacheStorage(
+                mediaSourceId = MediaCacheManager.LOCAL_IMPORT_MEDIA_SOURCE_ID,
+                datastore = metadataStore,
+                importEngine = LocalImportMediaCacheEngine(
+                    fileAccess = createLocalImportFileAccess(getContext()),
+                ),
+                displayName = "本地导入",
+                parentCoroutineContext = coroutineScope.childScopeContext(),
+            )
+        }
+
+        // 旧缓存管理 (fork 的缓存页) 与上游新下载架构共用同一批 storage 实例,
+        // 深度迁移到 MediaDownloadManager 之前两者并存.
+        single<MediaCacheManager> {
+            val id = MediaCacheManager.LOCAL_FS_MEDIA_SOURCE_ID
             val engines = get<TorrentManager>().engines
             val metadataStore = getContext().dataStores.mediaCacheMetadataStore
+            val localImportStorage = get<LocalImportMediaCacheStorage>()
 
-            MediaDownloadManager(
-                storages = buildList(capacity = engines.size) {
-                    /*if (currentAniBuildConfig.isDebug) {
-                        // 注意, 这个必须要在第一个, 见 [DefaultTorrentManager.engines] 注释
-                        add(
-                            @Suppress("DEPRECATION")
-                            TorrentMediaCacheStorage(
-                                mediaSourceId = "test-in-memory",
-                                store = metadataStore,
-                                engine = DummyMediaCacheEngine("test-in-memory"),
-                                "[debug]dummy",
-                                coroutineScope.childScopeContext(),
-                            ),
-                        )
-                    }*/
+            MediaCacheManagerImpl(
+                storagesIncludingDisabled = buildList(capacity = engines.size + 2) {
+                    add(
+                        @Suppress("DEPRECATION")
+                        HttpMediaCacheStorage(
+                            mediaSourceId = id,
+                            store = metadataStore,
+                            dao = database.httpCacheDownloadStateDao(),
+                            httpEngine = get<HttpMediaCacheEngine>(),
+                            displayName = "LocalWebM3u",
+                            coroutineScope.childScopeContext(),
+                        ),
+                    )
                     for (engine in engines) {
                         val isPikPak = engine.type == TorrentEngineType.PikPak
                         add(
@@ -446,18 +481,15 @@ private fun KoinApplication.otherModules(
                             ),
                         )
                     }
-                    add(
-                        @Suppress("DEPRECATION")
-                        HttpMediaCacheStorage(
-                            mediaSourceId = id,
-                            store = metadataStore,
-                            dao = database.httpCacheDownloadStateDao(),
-                            httpEngine = get<HttpMediaCacheEngine>(),
-                            displayName = "LocalWebM3u",
-                            coroutineScope.childScopeContext(),
-                        ),
-                    )
+                    add(localImportStorage)
                 },
+                backgroundScope = coroutineScope.childScope(),
+            )
+        }
+
+        single<MediaDownloadManager> {
+            MediaDownloadManager(
+                storages = get<MediaCacheManager>().storagesIncludingDisabled,
                 backgroundScope = coroutineScope.childScope(),
             )
         }

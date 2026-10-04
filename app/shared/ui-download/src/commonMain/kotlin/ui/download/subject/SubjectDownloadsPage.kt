@@ -58,6 +58,7 @@ fun SubjectDownloadsPage(
     modifier: Modifier = Modifier,
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
     navigationIcon: @Composable () -> Unit = {},
+    danmaku: SubjectDanmakuBatchUi = SubjectDanmakuBatchUi(),
 ) {
     val selected = state.downloads.filter { it.id in selection.selectedIds }
     LaunchedEffect(state.downloads, state.downloadsLoading) {
@@ -132,6 +133,9 @@ fun SubjectDownloadsPage(
                 selectedEntries = selected,
                 onPauseAll = actions.pauseAll,
                 onResumeAll = actions.resumeAll,
+                danmakuBatchState = danmaku.batchState,
+                missingDanmakuEpisodeCount = danmaku.missingEpisodeCount,
+                onCacheAllDanmaku = danmaku.onCacheAll,
             )
             SubjectDownloadsContent(
                 state = state,
@@ -141,6 +145,7 @@ fun SubjectDownloadsPage(
                 onPlay = onPlay,
                 onViewDetail = onViewDetail,
                 modifier = Modifier.weight(1f),
+                danmaku = danmaku,
             )
         }
     }

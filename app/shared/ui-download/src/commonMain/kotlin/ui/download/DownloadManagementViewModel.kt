@@ -12,21 +12,35 @@ package me.him188.ani.app.ui.download
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration.Companion.seconds
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
+import me.him188.ani.app.data.models.subject.SubjectInfo
+import me.him188.ani.app.data.network.AniSubjectSearchService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.repository.player.EpisodePlayHistoryRepository
+import me.him188.ani.app.data.repository.subject.CollectionsFilterQuery
 import me.him188.ani.app.data.repository.subject.OfflineSubjectDisplayInfo
 import me.him188.ani.app.data.repository.subject.SubjectCollectionRepository
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
 import me.him188.ani.app.domain.media.download.DownloadOperation
 import me.him188.ani.app.domain.media.download.DownloadOperations
 import me.him188.ani.app.domain.media.download.MediaDownloadManager
+import me.him188.ani.app.ui.cache.ImportSubjectCandidate
 import me.him188.ani.app.ui.download.components.DownloadItem
 import me.him188.ani.app.ui.download.components.SubjectDownloadGroup
 import me.him188.ani.app.ui.download.components.toDownloadItem
@@ -35,6 +49,8 @@ import me.him188.ani.app.ui.download.subject.SubjectDownloadsPresenterFactory
 import me.him188.ani.app.ui.foundation.AbstractViewModel
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
 import me.him188.ani.utils.coroutines.sampleWithInitial
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 /**
  * 全局下载管理页面: 所有存储中的下载按条目分组展示.
@@ -43,13 +59,18 @@ import me.him188.ani.utils.coroutines.sampleWithInitial
  */
 class DownloadManagementViewModel(
     downloadManager: MediaDownloadManager,
-    subjects: SubjectCollectionRepository,
+    private val subjects: SubjectCollectionRepository,
     histories: EpisodePlayHistoryRepository,
     operations: DownloadOperations,
     private val presenters: SubjectDownloadsPresenterFactory,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
-) : AbstractViewModel(coroutineContext) {
+) : AbstractViewModel(coroutineContext), KoinComponent {
     private val operationRunner = DownloadOperationRunner(operations, backgroundScope)
+
+    // 本地导入相关依赖: 懒注入, 仅在调用导入功能时解析 (测试构造无 Koin 环境也不受影响).
+    private val importLocalVideosUseCase: ImportLocalVideosUseCase by inject()
+    private val subjectSearchService: AniSubjectSearchService by inject()
+    private val bangumiSearchService: BangumiSearchService by inject()
 
     private val currentSubjectPresenter = MutableStateFlow<SubjectDownloadsPresenter?>(null)
 
@@ -126,6 +147,56 @@ class DownloadManagementViewModel(
     val operationFailures: StateFlow<Int> get() = operationRunner.failedCount
 
     fun dismissOperationFailures() = operationRunner.dismissFailures()
+
+    /**
+     * 本地导入: 供选择条目的收藏列表, 支持按收藏类型过滤.
+     */
+    fun importSubjectsPager(query: CollectionsFilterQuery): Flow<PagingData<SubjectCollectionInfo>> =
+        subjects.subjectCollectionsPager(query)
+            .cachedIn(backgroundScope)
+
+    /**
+     * 本地导入 (自动匹配): 同时搜索 Ani 服务器与 Bangumi (bgm.tv), 合并去重后返回候选列表.
+     *
+     * Bangumi 官方搜索对罗马音的匹配通常好于 Ani 服务器, 两者互为补充.
+     */
+    suspend fun searchSubjectsForImport(keywords: String): List<ImportSubjectCandidate> = coroutineScope {
+        val ani = async { runCatching { searchAni(keywords) }.getOrDefault(emptyList()) }
+        val bangumi = async { runCatching { searchBangumi(keywords) }.getOrDefault(emptyList()) }
+        (ani.await() + bangumi.await()).distinctBy { it.subjectId }
+    }
+
+    private suspend fun searchAni(keywords: String): List<ImportSubjectCandidate> =
+        subjectSearchService.searchSubjects(keywords, limit = 20)
+            .map {
+                ImportSubjectCandidate(
+                    subjectId = it.subjectInfo.subjectId,
+                    displayName = it.subjectInfo.displayName,
+                    imageUrl = it.subjectInfo.imageLarge,
+                )
+            }
+
+    private suspend fun searchBangumi(keywords: String): List<ImportSubjectCandidate> =
+        bangumiSearchService.searchSubjects(keywords)
+            .map { ImportSubjectCandidate(it.subjectId, it.nameCn.ifBlank { it.name }, it.imageUrl) }
+
+    /**
+     * 本地导入: 加载条目的完整信息 (含剧集列表), 用于剧集匹配与导入.
+     * 对未收藏的条目同样可用 (会自动从服务器获取并缓存).
+     */
+    suspend fun loadSubjectForImport(subjectId: Int): SubjectCollectionInfo {
+        return subjects.subjectCollectionFlow(subjectId).first()
+    }
+
+    /**
+     * 本地导入: 将文件导入为指定条目的已完成缓存.
+     *
+     * @return 实际新导入的数量, 重复导入的文件会被跳过.
+     */
+    suspend fun importLocalFiles(subjectInfo: SubjectInfo, items: List<LocalImportFileItem>): Int {
+        if (items.isEmpty()) return 0
+        return importLocalVideosUseCase.import(subjectInfo, items)
+    }
 
     private data class SubjectMetadata(val type: UnifiedCollectionType?, val info: OfflineSubjectDisplayInfo?)
 }

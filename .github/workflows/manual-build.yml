@@ -1,0 +1,251 @@
+name: Manual Build (Windows & Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: '构建平台 (android / windows / all)'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - 'android'
+          - 'windows'
+          - 'all'
+      release_tag:
+        description: '发布版本号 (留空=使用仓库版本; 填写=构建产物与发布均使用此版本, 支持 v 前缀)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: 'Build Android APK'
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Enable Linux Swap
+        run: sudo fallocate -l 4G /swapfile 2>/dev/null && sudo chmod 600 /swapfile && sudo mkswap /swapfile 2>/dev/null && sudo swapon /swapfile 2>/dev/null || true
+
+      - name: Configure local.properties
+        run: |
+          cat << 'EOF' >> local.properties
+          ani.android.abis=arm64-v8a
+          ani.android.splits=false
+          ani.android.universal=false
+          ani.enable.firebase=false
+          jvm.toolchain.version=21
+          kotlin.native.ignoreDisabledTargets=true
+          signing_release_storeFileFromRoot=signing/animeko-release.keystore
+          signing_release_storePassword=animeko123
+          signing_release_keyAlias=animeko
+          signing_release_keyPassword=animeko123
+          EOF
+
+      - name: Override version from release input
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          sed -i -E "s|^version\.name=.*|version.name=${VERSION}|" gradle.properties
+          sed -i -E "s|^package\.version=.*|package.version=${VERSION%-*}|" gradle.properties
+          echo "构建版本号已覆写为: ${VERSION}"
+
+      - name: Cache JBR 21
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/jbrsdk_jcef-21*
+          key: jbr-21-${{ runner.os }}-${{ hashFiles('.github/workflows/download_jbr.py') }}
+
+      - name: Download JBR 21
+        id: download-jbr
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+          JBR_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-linux-x64-b1163.116.tar.gz'
+          JBR_CHECKSUM_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-linux-x64-b1163.116.tar.gz.checksum'
+        run: python3 .github/workflows/download_jbr.py
+
+      - name: Setup JBR 21
+        uses: gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d
+        with:
+          java-version: '21'
+          distribution: 'jdkfile'
+          jdkFile: ${{ steps.download-jbr.outputs.jbrLocation }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Build Android Release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDefaultRelease --parallel --build-cache
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ani-android-release-apk
+          path: app/android/build/outputs/apk/default/release/*.apk
+          if-no-files-found: error
+
+  build-windows:
+    name: 'Build Windows Distributable'
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure local.properties
+        shell: bash
+        run: |
+          echo "ani.enable.firebase=false" >> local.properties
+          echo "jvm.toolchain.version=21" >> local.properties
+
+      - name: Override version from release input
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          sed -i -E "s|^version\.name=.*|version.name=${VERSION}|" gradle.properties
+          sed -i -E "s|^package\.version=.*|package.version=${VERSION%-*}|" gradle.properties
+          echo "构建版本号已覆写为: ${VERSION}"
+
+      - name: Cache JBR 21
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/jbrsdk_jcef-21*
+          key: jbr-21-${{ runner.os }}-${{ hashFiles('.github/workflows/download_jbr.py') }}
+
+      - name: Download JBR 21
+        id: download-jbr
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+          JBR_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-windows-x64-b1163.116.tar.gz'
+          JBR_CHECKSUM_URL: 'https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk_jcef-21.0.11-windows-x64-b1163.116.tar.gz.checksum'
+        shell: cmd
+        run: python .github/workflows/download_jbr.py
+
+      - name: Setup JBR 21
+        uses: gmitch215/setup-java@6d2c5e1f82f180ae79f799f0ed6e3e5efb4e664d
+        with:
+          java-version: '21'
+          distribution: 'jdkfile'
+          jdkFile: ${{ steps.download-jbr.outputs.jbrLocation }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Build Windows Release Distributable
+        shell: bash
+        run: ./gradlew :app:desktop:createReleaseDistributable --parallel --build-cache
+
+      - name: Upload Windows Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ani-windows-x64-portable
+          path: app/desktop/build/compose/binaries/main-release/app
+          if-no-files-found: error
+
+  publish-release:
+    name: 'Publish to GitHub Release'
+    needs: [build-android, build-windows]
+    # 仅在所有实际执行 (未跳过) 的构建任务全部成功时发布; 任一构建失败或取消都不会再走发布流程.
+    if: ${{ !cancelled() && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped') && (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: raw-artifacts
+
+      - name: Determine Release Metadata
+        id: meta
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          CODE_VERSION=$(grep -E '^version\.name=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
+          if [ -z "$CODE_VERSION" ]; then
+            CODE_VERSION="6.2.0.2-alpha01"
+          fi
+
+          TAG="$RELEASE_TAG"
+          if [ -z "$TAG" ]; then
+            TAG="$CODE_VERSION"
+          fi
+
+          VERSION="${TAG#v}"
+
+          PLATFORM="${{ inputs.platform }}"
+          if [ "$PLATFORM" = "android" ]; then
+            NAME="${VERSION}-android-arm64-v8a-release"
+          elif [ "$PLATFORM" = "windows" ]; then
+            NAME="${VERSION}-windows-x64"
+          else
+            NAME="$TAG"
+          fi
+
+          BODY=""
+          if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
+            BODY="Android平台使用了新的固定签名证书，若从官方主线版本迁移需要先卸载再安装，建议先备份当前配置"
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Package Assets for Release
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p release-files
+          if [ -d "raw-artifacts/ani-android-release-apk" ]; then
+            for f in raw-artifacts/ani-android-release-apk/*.apk; do
+              [ -f "$f" ] && cp "$f" "release-files/Animeko-${VERSION}-android-arm64-v8a-release.apk"
+            done
+          fi
+          if [ -d "raw-artifacts/ani-windows-x64-portable" ]; then
+            cd raw-artifacts/ani-windows-x64-portable
+            zip -r ../../release-files/Animeko-${VERSION}-windows-x64.zip .
+            cd ../..
+          fi
+          ls -lh release-files
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          body: ${{ steps.meta.outputs.body }}
+          files: release-files/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

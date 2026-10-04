@@ -113,5 +113,6 @@ value class MediaCacheEngineKey(val key: String) {
         val Anitorrent = MediaCacheEngineKey(TorrentEngineType.Anitorrent.id)
         val PikPak = MediaCacheEngineKey(TorrentEngineType.PikPak.id)
         val WebM3u = MediaCacheEngineKey("web-m3u")
+        val LocalFileImport = MediaCacheEngineKey("local-file-import")
     }
 }

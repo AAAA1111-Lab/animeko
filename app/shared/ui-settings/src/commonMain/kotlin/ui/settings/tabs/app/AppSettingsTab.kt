@@ -118,6 +118,7 @@ import me.him188.ani.app.ui.lang.settings_player_remember_playback_speed
 import me.him188.ani.app.ui.lang.settings_player_remember_playback_speed_description
 import me.him188.ani.app.ui.lang.settings_player_video_enhancement_default
 import me.him188.ani.app.ui.lang.settings_player_video_enhancement_default_description
+import me.him188.ani.app.ui.lang.video_player_fast
 import me.him188.ani.app.ui.lang.video_player_off
 import me.him188.ani.app.ui.lang.video_player_performance
 import me.him188.ani.app.ui.lang.video_player_quality
@@ -528,8 +529,9 @@ fun SettingsScope.PlayerGroup(
             selected = { config.videoEnhancementDefaultMode },
             values = {
                 listOf(
-                    VideoEnhancementDefaultMode.PERFORMANCE,
                     VideoEnhancementDefaultMode.QUALITY,
+                    VideoEnhancementDefaultMode.PERFORMANCE,
+                    VideoEnhancementDefaultMode.FAST,
                     VideoEnhancementDefaultMode.OFF,
                 )
             },
@@ -537,6 +539,7 @@ fun SettingsScope.PlayerGroup(
                 Text(
                     when (it) {
                         VideoEnhancementDefaultMode.OFF -> stringResource(Lang.video_player_off)
+                        VideoEnhancementDefaultMode.FAST -> stringResource(Lang.video_player_fast)
                         VideoEnhancementDefaultMode.PERFORMANCE -> stringResource(Lang.video_player_performance)
                         VideoEnhancementDefaultMode.QUALITY -> stringResource(Lang.video_player_quality)
                     },

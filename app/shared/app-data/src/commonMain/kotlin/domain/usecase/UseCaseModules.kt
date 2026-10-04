@@ -38,6 +38,8 @@ import me.him188.ani.app.domain.media.cache.DeleteCacheUseCase
 import me.him188.ani.app.domain.media.cache.DeleteCacheUseCaseImpl
 import me.him188.ani.app.domain.media.cache.GetMediaCacheUseCase
 import me.him188.ani.app.domain.media.cache.GetMediaCacheUseCaseImpl
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCase
+import me.him188.ani.app.domain.media.cache.ImportLocalVideosUseCaseImpl
 import me.him188.ani.app.domain.media.download.AddDownloadUseCase
 import me.him188.ani.app.domain.media.download.AddDownloadUseCaseImpl
 import me.him188.ani.app.domain.media.download.DownloadRequestSessionFactory
@@ -95,11 +97,12 @@ fun KoinApplication.useCaseModules() = module {
     single<GetMediaSourceInstancesUseCase> { GetMediaSourceInstancesUseCaseImpl(get()) }
     single<GetSubjectRecommendationUseCase> { GetSubjectRecommendationUseCaseImpl(get()) }
     single<GetMediaCacheUseCase> { GetMediaCacheUseCaseImpl(get()) }
-    single<DeleteCacheUseCase> { DeleteCacheUseCaseImpl(get(), get()) }
+    single<ImportLocalVideosUseCase> { ImportLocalVideosUseCaseImpl(get(), get()) }
     single<AddDownloadUseCase> {
         AddDownloadUseCaseImpl(get(), cacheDanmaku = { get<DanmakuRepository>().cacheDanmakuIfNeeded(it) })
     }
     single { DownloadRequestSessionFactory(get(), get(), get(), MediaSelectorFactory.withKoin(koin), get(), get()) }
+    single<DeleteCacheUseCase> { DeleteCacheUseCaseImpl(get(), get()) }
     single<GetPreferredWebMediaSourceUseCase> { GetPreferredWebMediaSourceUseCaseImpl(get()) }
     single<SetPreferredWebMediaSourceUseCase> { SetPreferredWebMediaSourceUseCaseImpl(get()) }
     single<ReplayBrowseMemoryUseCase> {

@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -33,11 +31,13 @@ import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -59,25 +59,44 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.name
+import kotlinx.coroutines.launch
+import me.him188.ani.app.data.models.episode.displayName
+import me.him188.ani.app.data.models.subject.SubjectCollectionInfo
 import me.him188.ani.app.domain.media.cache.engine.MediaStats
+import me.him188.ani.app.domain.media.cache.storage.LocalImportFileItem
+import me.him188.ani.app.domain.media.parser.EpisodeFilenameParser
 import me.him188.ani.app.ui.adaptive.AniListDetailPaneScaffold
 import me.him188.ani.app.ui.adaptive.AniTopAppBar
 import me.him188.ani.app.ui.adaptive.AniTopAppBarDefaults
 import me.him188.ani.app.ui.adaptive.PaneScope
+import me.him188.ani.app.ui.cache.ImportModeChooserDialog
+import me.him188.ani.app.ui.cache.ImportSubjectCandidate
+import me.him188.ani.app.ui.cache.ImportSubjectPickerDialog
+import me.him188.ani.app.ui.cache.ImportSubjectSearchDialog
+import me.him188.ani.app.ui.cache.subject.LocalMediaImportDialog
 import me.him188.ani.app.ui.download.components.DownloadFilterAndSortBar
 import me.him188.ani.app.ui.download.components.DownloadItem
 import me.him188.ani.app.ui.download.components.DownloadOverallStats
@@ -110,8 +129,13 @@ import me.him188.ani.app.ui.foundation.widgets.LocalToaster
 import me.him188.ani.app.ui.lang.Lang
 import me.him188.ani.app.ui.lang.cache_episode_pause_download
 import me.him188.ani.app.ui.lang.cache_episode_resume_download
+import me.him188.ani.app.ui.lang.cache_import_already_imported
+import me.him188.ani.app.ui.lang.cache_import_local_media
+import me.him188.ani.app.ui.lang.cache_import_success
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_confirmation
 import me.him188.ani.app.ui.lang.cache_management_delete_cache_title
+import me.him188.ani.app.ui.lang.cache_management_delete_local_import_confirmation
+import me.him188.ani.app.ui.lang.cache_management_delete_local_import_mixed_hint
 import me.him188.ani.app.ui.lang.cache_management_enter_selection_mode
 import me.him188.ani.app.ui.lang.cache_management_exit_selection
 import me.him188.ani.app.ui.lang.cache_management_invalid_cache_info
@@ -181,6 +205,143 @@ fun DownloadManagementScreen(
             confirmButton = { TextButton(onClick = vm::dismissOperationFailures) { Text(stringResource(Lang.cache_subject_cancel)) } },
         )
     }
+
+    // region 本地导入: 选文件 -> 选择模式 (自动匹配 / 从追番列表选择) -> 剧集匹配 -> 导入
+    var importCandidateFiles by remember { mutableStateOf<List<PlatformFile>>(emptyList()) }
+    var showImportModeChooser by remember { mutableStateOf(false) }
+    var showImportCollectionPicker by remember { mutableStateOf(false) }
+    var showImportSearchPicker by remember { mutableStateOf(false) }
+    var importSubjectCandidate by remember { mutableStateOf<ImportSubjectCandidate?>(null) }
+    var importSubjectInfo by remember { mutableStateOf<SubjectCollectionInfo?>(null) }
+    val toaster = LocalToaster.current
+    val scope = rememberCoroutineScope()
+    val importSuccessTemplate = stringResource(Lang.cache_import_success)
+    val alreadyImportedText = stringResource(Lang.cache_import_already_imported)
+    val importVideoExtensions = remember {
+        listOf("mp4", "mkv", "avi", "flv", "ts", "webm", "mov", "m4v", "wmv", "rmvb")
+    }
+    val importFilePickerLauncher = rememberFilePickerLauncher(
+        type = FileKitType.File(extensions = importVideoExtensions),
+        mode = FileKitMode.Multiple(),
+    ) { files ->
+        if (!files.isNullOrEmpty()) {
+            importCandidateFiles = files
+            showImportModeChooser = true
+        }
+    }
+
+    fun dismissImportDialogs() {
+        showImportModeChooser = false
+        showImportCollectionPicker = false
+        showImportSearchPicker = false
+        importCandidateFiles = emptyList()
+    }
+
+    if (showImportModeChooser) {
+        ImportModeChooserDialog(
+            fileCount = importCandidateFiles.size,
+            onDismiss = { dismissImportDialogs() },
+            onAutoMatch = {
+                showImportModeChooser = false
+                showImportSearchPicker = true
+            },
+            onFromCollection = {
+                showImportModeChooser = false
+                showImportCollectionPicker = true
+            },
+        )
+    }
+
+    if (showImportCollectionPicker) {
+        ImportSubjectPickerDialog(
+            pagerFactory = { query -> vm.importSubjectsPager(query) },
+            onDismiss = { dismissImportDialogs() },
+            onSelect = {
+                showImportCollectionPicker = false
+                importSubjectCandidate = it
+            },
+        )
+    }
+
+    if (showImportSearchPicker) {
+        val autoKeywords = remember(importCandidateFiles) {
+            importCandidateFiles.firstOrNull()?.name?.let { EpisodeFilenameParser.guessTitle(it) }
+        }
+        ImportSubjectSearchDialog(
+            initialKeywords = autoKeywords,
+            onSearch = { vm.searchSubjectsForImport(it) },
+            onDismiss = { dismissImportDialogs() },
+            onSelect = {
+                showImportSearchPicker = false
+                importSubjectCandidate = it
+            },
+            onManualFallback = {
+                showImportSearchPicker = false
+                showImportCollectionPicker = true
+            },
+        )
+    }
+
+    importSubjectCandidate?.let { candidate ->
+        val loadedSubject by produceState<SubjectCollectionInfo?>(null, candidate.subjectId) {
+            value = runCatching { vm.loadSubjectForImport(candidate.subjectId) }.getOrNull()
+        }
+        when (val subject = loadedSubject) {
+            null -> AlertDialog(
+                onDismissRequest = { importSubjectCandidate = null },
+                title = { Text(candidate.displayName) },
+                text = {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                },
+                confirmButton = {},
+            )
+
+            else -> LocalMediaImportDialog(
+                files = importCandidateFiles,
+                episodes = subject.episodes.map { it.episodeInfo },
+                subjectTitle = subject.subjectInfo.displayName,
+                onDismissRequest = {
+                    importSubjectCandidate = null
+                    importSubjectInfo = null
+                    importCandidateFiles = emptyList()
+                },
+                onConfirm = { candidates ->
+                    importSubjectCandidate = null
+                    importSubjectInfo = null
+                    val items = candidates.mapNotNull { c ->
+                        val ep = c.targetEpisode ?: return@mapNotNull null
+                        LocalImportFileItem(
+                            filePath = c.filePath,
+                            filename = c.filename,
+                            episodeSort = ep.sort,
+                            episodeId = ep.episodeId,
+                            episodeTitle = ep.displayName,
+                        )
+                    }
+                    if (items.isEmpty()) return@LocalMediaImportDialog
+                    scope.launch {
+                        val importedCount = vm.importLocalFiles(subject.subjectInfo, items)
+                        toaster.show(
+                            if (importedCount > 0) {
+                                importSuccessTemplate
+                                    .replace("%1\$d", importedCount.toString())
+                                    .replace("%d", importedCount.toString())
+                            } else {
+                                alreadyImportedText
+                            },
+                        )
+                    }
+                },
+            )
+        }
+    }
+    // endregion
+
     DownloadManagementScreen(
         state,
         selfInfo,
@@ -190,6 +351,7 @@ fun DownloadManagementScreen(
         onDelete = { vm.deleteDownload(it) },
         onViewDetail = { onNavigateCacheDetail(it.id) },
         onClickLogin = onClickLogin,
+        onImportLocalFiles = { importFilePickerLauncher.launch() },
         modifier = modifier,
         navigationIcon = navigationIcon,
         windowInsets = windowInsets,
@@ -228,6 +390,7 @@ fun DownloadManagementScreen(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     windowInsets: WindowInsets = AniWindowInsets.forPageContent(),
+    onImportLocalFiles: (() -> Unit)? = null,
     detailPaneContent: (@Composable PaneScope.(group: SubjectDownloadGroup?, selectionState: DownloadSelectionState) -> Unit)? = null,
 ) {
     val appBarColors = AniThemeDefaults.topAppBarColors()
@@ -302,6 +465,7 @@ fun DownloadManagementScreen(
     pendingDeleteEntries?.let { entries ->
         DeleteActionDialog(
             onDismiss = { pendingDeleteEntries = null },
+            confirmationKind = selectedEntries.deleteConfirmationKind(),
             confirmEnabled = state.groups.flatMap { it.entries }.none { current ->
                 current.isBusy && entries.any { it.id == current.id }
             },
@@ -337,6 +501,7 @@ fun DownloadManagementScreen(
                 },
                 selfInfo = selfInfo,
                 onClickLogin = onClickLogin,
+                onImportLocalFiles = onImportLocalFiles,
                 navigationIcon = navigationIcon,
                 appBarColors = appBarColors,
                 windowInsets = AniWindowInsets.forTopAppBarWithoutDesktopTitle(),
@@ -379,10 +544,7 @@ fun DownloadManagementScreen(
                     top = paddingValues.calculateTopPadding(),
                     end = paddingValues.calculateEndPadding(layoutDirection),
                 )
-                // 设计稿: 超大屏时整体限宽.
-                .fillMaxWidth()
-                .wrapContentWidth()
-                .widthIn(max = 1200.dp),
+                .fillMaxWidth(),
             navigator = navigator,
             listPaneTopAppBar = null,
             listPaneContent = {
@@ -447,8 +609,9 @@ fun DownloadManagementScreen(
             contentWindowInsets = windowInsets.only(WindowInsetsSides.Horizontal),
             useSharedTransition = false,
             listPanePreferredWidth = preferredListPaneWidth(),
-            // 默认的 min 为 412.dp (≥1200dp 时), 会顶掉 400.dp 的 preferred 宽度.
-            minListPaneWidth = preferredListPaneWidth(),
+            // 最小值固定为 360dp: 若跟随 preferred (50% 窗口), 两栏最小值之和会超出可用宽度.
+            minListPaneWidth = 360.dp,
+            minDetailPaneWidth = 360.dp,
         )
 
         // 选择模式下导航返回应该退出选择模式.
@@ -458,17 +621,20 @@ fun DownloadManagementScreen(
 }
 
 /**
- * 设计稿: 超大屏 (1600dp+) 时左栏固定 400dp.
+ * 双栏布局下左栏默认占窗口一半 (400-760dp): 保证统计/筛选行单行容纳, 避免详情栏大面积留白.
+ * 旧设计稿把左栏固定在 360-412dp (按 840/1200dp 分档), 在 1000dp 左右的窗口上左栏过于局促.
+ * 拖动手柄仍可自行调整.
  */
 @Composable
 private fun preferredListPaneWidth(): Dp {
     val windowSizeClass = currentWindowAdaptiveInfo1().windowSizeClass
-    return when {
-        windowSizeClass.isWidthAtLeastBreakpoint(1600) -> 400.dp
-        windowSizeClass.isWidthAtLeastBreakpoint(1200) -> 412.dp // Large, M3 spec
-        windowSizeClass.isWidthAtLeastBreakpoint(840) -> 360.dp // Expanded, M3 spec
-        else -> (((windowSizeClass.minWidthDp - 24 * 3).toFloat() / 2).dp).coerceAtLeast(360.dp) // M3 spec
+    if (!windowSizeClass.isWidthAtLeastBreakpoint(840)) {
+        return (((windowSizeClass.minWidthDp - 24 * 3).toFloat() / 2).dp).coerceAtLeast(360.dp) // M3 spec, 单栏
     }
+    val windowWidthDp = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.width.toDp()
+    }
+    return (windowWidthDp * 0.5f).coerceIn(400.dp, 760.dp)
 }
 
 /**
@@ -658,6 +824,7 @@ private fun DownloadManagementTopBar(
     onToggleSelectAll: () -> Unit,
     selfInfo: SelfInfoUiState?,
     onClickLogin: () -> Unit,
+    onImportLocalFiles: (() -> Unit)? = null,
     navigationIcon: @Composable () -> Unit,
     appBarColors: TopAppBarColors,
     windowInsets: WindowInsets,
@@ -707,6 +874,12 @@ private fun DownloadManagementTopBar(
             title = { AniTopAppBarDefaults.Title(stringResource(Lang.main_screen_page_cache_management)) },
             navigationIcon = navigationIcon,
             actions = {
+                if (onImportLocalFiles != null) {
+                    val importLocalMediaText = stringResource(Lang.cache_import_local_media)
+                    IconButton(onClick = onImportLocalFiles) {
+                        Icon(Icons.Rounded.FileOpen, importLocalMediaText)
+                    }
+                }
                 val enterSelectionModeText = stringResource(Lang.cache_management_enter_selection_mode)
                 IconButton(
                     onClick = onEnterSelection,
@@ -759,17 +932,59 @@ object DownloadManagementTestTags {
     const val DELETE_CONFIRM_BUTTON = "cache_management_delete_confirm_button"
 }
 
+/**
+ * 删除确认的类型, 决定确认对话框的文案.
+ */
+internal enum class DeleteConfirmationKind {
+    /** 仅真缓存 (BT/网页等): 删除后不可恢复. */
+    REAL_CACHE_ONLY,
+
+    /** 仅本地导入: 软引用磁盘原文件, 删除不会影响原文件. */
+    LOCAL_IMPORT_ONLY,
+
+    /** 真缓存与本地导入混合. */
+    MIXED,
+}
+
+internal fun List<DownloadItem>.deleteConfirmationKind(): DeleteConfirmationKind {
+    val hasLocalImport = any { it.isLocalImport }
+    val hasRealCache = any { !it.isLocalImport }
+    return when {
+        hasLocalImport && hasRealCache -> DeleteConfirmationKind.MIXED
+        hasLocalImport -> DeleteConfirmationKind.LOCAL_IMPORT_ONLY
+        else -> DeleteConfirmationKind.REAL_CACHE_ONLY
+    }
+}
+
 @Composable
 internal fun DeleteActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    confirmationKind: DeleteConfirmationKind = DeleteConfirmationKind.REAL_CACHE_ONLY,
     confirmEnabled: Boolean = true,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
         title = { Text(stringResource(Lang.cache_management_delete_cache_title)) },
-        text = { Text(stringResource(Lang.cache_management_delete_cache_confirmation)) },
+        text = {
+            when (confirmationKind) {
+                DeleteConfirmationKind.REAL_CACHE_ONLY ->
+                    Text(stringResource(Lang.cache_management_delete_cache_confirmation))
+
+                DeleteConfirmationKind.LOCAL_IMPORT_ONLY ->
+                    Text(stringResource(Lang.cache_management_delete_local_import_confirmation))
+
+                DeleteConfirmationKind.MIXED -> Column {
+                    Text(stringResource(Lang.cache_management_delete_cache_confirmation))
+                    Text(
+                        stringResource(Lang.cache_management_delete_local_import_mixed_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,

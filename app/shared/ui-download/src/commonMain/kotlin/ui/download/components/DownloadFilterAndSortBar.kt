@@ -202,6 +202,7 @@ private fun DownloadFilterRow(
     onStatusChange: (DownloadStatusFilter?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 三个筛选 chip 永不换行: 超出宽度时横向滚动 (鼠标按住 Shift 滚轮, 或拖动).
     Row(
         modifier
             .fillMaxWidth()

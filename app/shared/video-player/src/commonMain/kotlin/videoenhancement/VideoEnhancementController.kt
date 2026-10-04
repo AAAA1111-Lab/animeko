@@ -26,6 +26,7 @@ import kotlin.coroutines.CoroutineContext
 
 enum class VideoEnhancementMode {
     OFF,
+    FAST,
     PERFORMANCE,
     QUALITY,
 }

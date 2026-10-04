@@ -46,6 +46,7 @@ import me.him188.ani.app.ui.download.components.DownloadSelectionState
 import me.him188.ani.app.ui.foundation.LocalSubjectAppearanceSettings
 import me.him188.ani.app.ui.foundation.theme.stronglyWeaken
 import me.him188.ani.app.ui.lang.Lang
+import me.him188.ani.app.ui.lang.cache_danmaku_episode_cached
 import me.him188.ani.app.ui.lang.cache_filter_collection_done
 import me.him188.ani.app.ui.lang.cache_filter_collection_dropped
 import me.him188.ani.app.ui.lang.cache_management_episode_label
@@ -88,6 +89,7 @@ fun SubjectDownloadsContent(
     modifier: Modifier = Modifier,
     rowShape: Shape = RectangleShape,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    danmaku: SubjectDanmakuBatchUi = SubjectDanmakuBatchUi(),
     header: @Composable () -> Unit = {},
 ) {
     LazyVerticalGrid(
@@ -131,6 +133,8 @@ fun SubjectDownloadsContent(
                     canCancel = state.request.canCancel,
                     onDownload = { actions.download(item.episode.episodeId) },
                     onCancel = actions.cancelRequest,
+                    // 媒体没缓存不代表弹幕没缓存, 没有这一行的话用户无法判断"缓存全部弹幕"到底做了哪些集.
+                    cachedDanmakuCount = danmaku.cachedCounts[item.episode.episodeId] ?: 0,
                 )
                 is SubjectDownloadListItem.Download -> {
                     val download = item.download
@@ -163,6 +167,7 @@ fun EpisodeDownloadRow(
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    cachedDanmakuCount: Int = 0,
 ) {
     Row(
         modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.38f).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -183,6 +188,15 @@ fun EpisodeDownloadRow(
             UnifiedCollectionType.DONE -> WatchStatusLabel(stringResource(Lang.cache_filter_collection_done))
             UnifiedCollectionType.DROPPED -> WatchStatusLabel(stringResource(Lang.cache_filter_collection_dropped))
             else -> Unit
+        }
+        if (cachedDanmakuCount > 0) {
+            Text(
+                stringResource(Lang.cache_danmaku_episode_cached, cachedDanmakuCount),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.testTag(SubjectDownloadsTestTags.DANMAKU_CACHED_BADGE),
+            )
         }
         if (busy) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)

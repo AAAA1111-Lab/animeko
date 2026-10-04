@@ -10,6 +10,7 @@
 package me.him188.ani.app.ui.download.subject
 
 import androidx.compose.runtime.Immutable
+import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheState
 import me.him188.ani.app.ui.download.components.DownloadItem
 import me.him188.ani.datasources.api.EpisodeSort
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
@@ -42,6 +43,20 @@ data class DownloadRequestUiState(
     val episodeIds: Set<Int> = emptySet(),
     val busy: Boolean = false,
     val canCancel: Boolean = false,
+)
+
+/**
+ * 条目维度的弹幕批量缓存 UI 状态, 由 [me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager] 支撑.
+ *
+ * @param cachedCounts 条目下每集已缓存的弹幕条数 (无缓存的剧集不在 map 中).
+ * @param missingEpisodeCount 尚未缓存弹幕的剧集数, 为 0 时入口显示"弹幕已全部缓存".
+ */
+@Immutable
+data class SubjectDanmakuBatchUi(
+    val batchState: DanmakuBatchCacheState = DanmakuBatchCacheState(),
+    val cachedCounts: Map<Int, Int> = emptyMap(),
+    val missingEpisodeCount: Int = 0,
+    val onCacheAll: () -> Unit = {},
 )
 
 @Immutable

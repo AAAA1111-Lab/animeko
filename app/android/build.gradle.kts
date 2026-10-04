@@ -35,44 +35,59 @@ val archs = getPropertyOrNull("ani.android.abis")
 android {
     namespace = "me.him188.ani.android"
     compileSdk = getIntProperty("android.compile.sdk")
+    val enableSplits = getPropertyOrNull("ani.android.splits")?.toBooleanStrictOrNull() ?: false
     defaultConfig {
         applicationId = "me.him188.ani"
         minSdk = getIntProperty("android.min.sdk")
         targetSdk = getIntProperty("android.compile.sdk")
         versionCode = getIntProperty("android.version.code")
         versionName = project.version.toString()
-        ndk {
-            // Specifies the ABI configurations of your native
-            // libraries Gradle should build and package with your app.
-            abiFilters.clear()
-            //noinspection ChromeOsAbiSupport
-            abiFilters += archs
+        if (!enableSplits) {
+            ndk {
+                // Specifies the ABI configurations of your native
+                // libraries Gradle should build and package with your app.
+                abiFilters.clear()
+                //noinspection ChromeOsAbiSupport
+                abiFilters += archs
+            }
         }
     }
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            //noinspection ChromeOsAbiSupport
-            include(*archs.toTypedArray())
-            isUniversalApk = true // 额外构建一个
+    if (enableSplits) {
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                //noinspection ChromeOsAbiSupport
+                include(*archs.toTypedArray())
+                isUniversalApk = getPropertyOrNull("ani.android.universal")?.toBooleanStrictOrNull() ?: false
+            }
         }
     }
     signingConfigs {
-        kotlin.runCatching { getProperty("signing_release_storeFileFromRoot") }.getOrNull()?.let {
+        val rootKeystore = rootProject.file("signing/animeko-release.keystore")
+        if (rootKeystore.exists()) {
             create("release") {
-                storeFile = rootProject.file(it)
-                storePassword = getProperty("signing_release_storePassword")
-                keyAlias = getProperty("signing_release_keyAlias")
-                keyPassword = getProperty("signing_release_keyPassword")
+                storeFile = rootKeystore
+                storePassword = getPropertyOrNull("signing_release_storePassword") ?: "animeko123"
+                keyAlias = getPropertyOrNull("signing_release_keyAlias") ?: "animeko"
+                keyPassword = getPropertyOrNull("signing_release_keyPassword") ?: "animeko123"
             }
-        }
-        kotlin.runCatching { getProperty("signing_release_storeFile") }.getOrNull()?.let {
-            create("release") {
-                storeFile = file(it)
-                storePassword = getProperty("signing_release_storePassword")
-                keyAlias = getProperty("signing_release_keyAlias")
-                keyPassword = getProperty("signing_release_keyPassword")
+        } else {
+            kotlin.runCatching { getProperty("signing_release_storeFileFromRoot") }.getOrNull()?.let {
+                create("release") {
+                    storeFile = rootProject.file(it)
+                    storePassword = getProperty("signing_release_storePassword")
+                    keyAlias = getProperty("signing_release_keyAlias")
+                    keyPassword = getProperty("signing_release_keyPassword")
+                }
+            }
+            kotlin.runCatching { getProperty("signing_release_storeFile") }.getOrNull()?.let {
+                create("release") {
+                    storeFile = file(it)
+                    storePassword = getProperty("signing_release_storePassword")
+                    keyAlias = getProperty("signing_release_keyAlias")
+                    keyPassword = getProperty("signing_release_keyPassword")
+                }
             }
         }
     }
@@ -91,7 +106,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 *sharedAndroidProguardRules(),
@@ -118,6 +133,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

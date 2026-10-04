@@ -89,7 +89,8 @@ class AniApplication : Application() {
          * Only use torrent service at Android 8.1 (27) or above.
          * Our minimal support is Android 8.0 (26).
          */
-        val FEATURE_USE_TORRENT_SERVICE = true
+        val FEATURE_USE_TORRENT_SERVICE: Boolean
+            get() = Build.VERSION.SDK_INT >= 27
     }
 
     inner class Instance()
@@ -124,16 +125,18 @@ class AniApplication : Application() {
         val anitorrentTorrents: MutableStateFlow<Flow<List<TorrentCacheInfoEntity>>?> = MutableStateFlow(null)
         val anitorrentEpisodes: MutableStateFlow<Flow<List<TorrentCacheEpisodeEntity>>?> = MutableStateFlow(null)
         val mediaCacheBaseSaveDir: MutableStateFlow<File?> = MutableStateFlow(null)
-        val connectionManager = TorrentServiceConnectionManager(
-            this,
-            serviceTorrentsFlow = anitorrentTorrents,
-            serviceEpisodesFlow = anitorrentEpisodes,
-            mediaCacheBaseSaveDirFlow = mediaCacheBaseSaveDir,
-            startServiceImpl = ::startAniTorrentService,
-            stopServiceImpl = ::stopService,
-            processLifecycle = ProcessLifecycleOwner.get().lifecycle,
-            parentCoroutineContext = scope.coroutineContext,
-        )
+        val connectionManager = if (FEATURE_USE_TORRENT_SERVICE) {
+            TorrentServiceConnectionManager(
+                this,
+                serviceTorrentsFlow = anitorrentTorrents,
+                serviceEpisodesFlow = anitorrentEpisodes,
+                mediaCacheBaseSaveDirFlow = mediaCacheBaseSaveDir,
+                startServiceImpl = ::startAniTorrentService,
+                stopServiceImpl = ::stopService,
+                processLifecycle = ProcessLifecycleOwner.get().lifecycle,
+                parentCoroutineContext = scope.coroutineContext,
+            )
+        } else null
 
         startupTimeMonitor.mark(StepName.WindowAndContext)
 
@@ -186,21 +189,23 @@ class AniApplication : Application() {
             }
         }
 
-        // torrent_cache rows carry no engine; MediaCacheSave.engine says which engine owns a media.
-        val anitorrentMediaIds = dataStores.mediaCacheMetadataStore.data.map { saves ->
-            saves.filter { it.engine == MediaCacheEngineKey.Anitorrent }.map { it.origin.mediaId }.toSet()
+        if (connectionManager != null) {
+            // torrent_cache rows carry no engine; MediaCacheSave.engine says which engine owns a media.
+            val anitorrentMediaIds = dataStores.mediaCacheMetadataStore.data.map { saves ->
+                saves.filter { it.engine == MediaCacheEngineKey.Anitorrent }.map { it.origin.mediaId }.toSet()
+            }
+            val torrentCacheInfoDao = koin.get<AniDatabase>().torrentCacheInfoDao()
+            anitorrentTorrents.value = combine(
+                torrentCacheInfoDao.getAll(),
+                anitorrentMediaIds,
+            ) { entities, ids -> entities.filter { it.mediaId in ids } }
+            anitorrentEpisodes.value = combine(
+                torrentCacheInfoDao.getAllEpisodes(),
+                anitorrentMediaIds,
+            ) { entities, ids -> entities.filter { it.mediaId in ids } }
+            mediaCacheBaseSaveDir.value = File(koin.get<MediaSaveDirProvider>().saveDir)
+            connectionManager.launchCheckLoop()
         }
-        val torrentCacheInfoDao = koin.get<AniDatabase>().torrentCacheInfoDao()
-        anitorrentTorrents.value = combine(
-            torrentCacheInfoDao.getAll(),
-            anitorrentMediaIds,
-        ) { entities, ids -> entities.filter { it.mediaId in ids } }
-        anitorrentEpisodes.value = combine(
-            torrentCacheInfoDao.getAllEpisodes(),
-            anitorrentMediaIds,
-        ) { entities, ids -> entities.filter { it.mediaId in ids } }
-        mediaCacheBaseSaveDir.value = File(koin.get<MediaSaveDirProvider>().saveDir)
-        connectionManager.launchCheckLoop()
 
         // The BT service above runs in :torrent_service and does nothing for this process, so PikPak
         // caches get their own foreground service here.

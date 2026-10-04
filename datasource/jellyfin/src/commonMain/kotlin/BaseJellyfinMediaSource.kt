@@ -40,6 +40,7 @@ import me.him188.ani.datasources.api.topic.FileSize
 import me.him188.ani.datasources.api.topic.ResourceLocation
 import me.him188.ani.utils.ktor.ScopedHttpClient
 import me.him188.ani.utils.logging.warn
+import me.him188.ani.utils.platform.isAudioCodecSupported
 
 private const val TYPE_EPISODE = "Episode"
 private const val TYPE_MOVIE = "Movie"
@@ -434,7 +435,7 @@ abstract class BaseJellyfinMediaSource(
                 mediaSourceId = mediaSourceId,
                 originalUrl = "$baseUrl/Items/$Id",
                 download = ResourceLocation.HttpStreamingFile(
-                    uri = getDownloadUri(Id, accessToken),
+                    uri = getStreamUri(Id, Container, accessToken, MediaStreams),
                 ),
                 originalTitle = originalTitle,
                 publishedTime = 0,
@@ -448,7 +449,7 @@ abstract class BaseJellyfinMediaSource(
                     subtitleKind = SubtitleKind.EXTERNAL_PROVIDED,
                 ),
                 extraFiles = MediaExtraFiles(
-                    subtitles = getSubtitles(Id, MediaStreams),
+                    subtitles = getSubtitles(Id, MediaStreams, accessToken),
                 ),
                 episodeRange = episodeRange,
                 location = MediaSourceLocation.Lan,
@@ -462,14 +463,40 @@ abstract class BaseJellyfinMediaSource(
         )
     }
 
+    protected open fun getStreamUri(itemId: String, container: String?, accessToken: String): String {
+        return getDownloadUri(itemId, accessToken)
+    }
+
+    /**
+     * 构造直接播放的地址.
+     *
+     * 当音轨是本机无法解码的编码 (例如 Android 8.0/API 26 上的 FLAC) 时, 请求服务端把音频转码成
+     * AAC, 视频仍然直接串流. 否则保持原始串流, 避免服务端做无谓的转码.
+     */
+    private fun getStreamUri(
+        itemId: String,
+        container: String?,
+        accessToken: String,
+        mediaStreams: List<MediaStream>,
+    ): String {
+        val needsAudioTranscode = mediaStreams.any { stream ->
+            stream.Type.equals("Audio", ignoreCase = true) &&
+                stream.Codec?.let { !isAudioCodecSupported(it) } == true
+        }
+        if (!needsAudioTranscode) {
+            return getStreamUri(itemId, container, accessToken)
+        }
+        return buildJellyfinTranscodeAudioUri(baseUrl, itemId, container, accessToken)
+    }
+
     protected abstract fun getDownloadUri(itemId: String, accessToken: String): String
 
-    private fun getSubtitles(itemId: String, mediaStreams: List<MediaStream>): List<Subtitle> {
+    private fun getSubtitles(itemId: String, mediaStreams: List<MediaStream>, accessToken: String): List<Subtitle> {
         return mediaStreams
             .filter { it.Type == "Subtitle" && it.IsTextSubtitleStream && it.IsExternal && it.Codec != null }
             .map { stream ->
                 Subtitle(
-                    uri = getSubtitleUri(itemId, stream.Index, stream.Codec!!),
+                    uri = getSubtitleUri(itemId, stream.Index, stream.Codec!!, accessToken),
                     language = stream.Language,
                     mimeType = when (stream.Codec.lowercase()) {
                         "ass" -> "text/x-ass"
@@ -480,8 +507,8 @@ abstract class BaseJellyfinMediaSource(
             }
     }
 
-    private fun getSubtitleUri(itemId: String, index: Int, codec: String): String {
-        return "$baseUrl/Videos/$itemId/$itemId/Subtitles/$index/0/Stream.$codec"
+    protected open fun getSubtitleUri(itemId: String, index: Int, codec: String, accessToken: String): String {
+        return "$baseUrl/Videos/$itemId/$itemId/Subtitles/$index/0/Stream.$codec?ApiKey=$accessToken&api_key=$accessToken"
     }
 
     private data class ParsedSubjectName(
@@ -857,6 +884,23 @@ private data class Item(
     val IndexNumber: Int? = null,
     val ParentIndexNumber: Int? = null,
     val Type: String,
+    val Container: String? = null,
     val ProviderIds: Map<String, String> = emptyMap(),
     val MediaStreams: List<MediaStream> = emptyList(),
 )
+
+/**
+ * 请求 Jellyfin 保留原始视频轨, 只把音频转码为 AAC 的串流地址.
+ *
+ * 服务端不接受 `static=true` 与 `AudioCodec` 同时出现, 因此这里不带 `static=true`.
+ */
+internal fun buildJellyfinTranscodeAudioUri(
+    baseUrl: String,
+    itemId: String,
+    container: String?,
+    accessToken: String,
+): String {
+    val ext = container?.split(",")?.firstOrNull()?.trim()?.removePrefix(".")?.takeIf { it.isNotEmpty() }
+    val streamPath = if (ext != null) "stream.$ext" else "stream"
+    return "$baseUrl/Videos/$itemId/$streamPath?AudioCodec=aac&ApiKey=$accessToken&api_key=$accessToken"
+}

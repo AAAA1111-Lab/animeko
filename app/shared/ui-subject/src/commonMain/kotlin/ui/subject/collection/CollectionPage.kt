@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -492,14 +491,7 @@ private fun CollectionPageLayout(
             Modifier.appChromeHazeSource(backgroundColor = AniThemeDefaults.pageContentBackgroundColor)
                 .fillMaxSize(),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentWidth()
-                    .widthIn(max = 1300.dp),
-            ) {
-                content(scrollBehavior?.nestedScrollConnection, topBarPaddings)
-            }
+            content(scrollBehavior?.nestedScrollConnection, topBarPaddings)
         }
     }
 }

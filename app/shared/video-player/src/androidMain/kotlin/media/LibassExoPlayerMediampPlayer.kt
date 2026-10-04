@@ -11,8 +11,10 @@ package me.him188.ani.app.videoplayer.media
 
 import android.content.Context
 import android.net.Uri
+import android.os.Looper
 import androidx.annotation.OptIn as AndroidxOptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException as Media3PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
@@ -43,6 +45,8 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import me.him188.ani.app.video.player.media.audio.AniRenderersFactory
 import me.him188.ani.utils.logging.logger
 import me.him188.ani.utils.logging.warn
 import org.openani.mediamp.ExperimentalMediampApi
@@ -57,6 +61,8 @@ import org.openani.mediamp.io.SeekableInput
 import org.openani.mediamp.source.MediaData
 import org.openani.mediamp.source.SeekableInputMediaData
 import org.openani.mediamp.source.UriMediaData
+import me.him188.ani.app.videoplayer.ui.videoDisplaySizeOrNull
+import org.openani.mediamp.metadata.MediaProperties
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.milliseconds
@@ -230,6 +236,28 @@ class LibassExoPlayerMediampPlayer private constructor(
             )
     }
 
+    override val mediaProperties: StateFlow<MediaProperties?> = object : StateFlow<MediaProperties?> {
+        private fun patchProperties(props: MediaProperties?): MediaProperties? {
+            if (props == null) return null
+            if (props.videoWidth != null && props.videoHeight != null) return props
+            val displaySize = if (Looper.myLooper() == Looper.getMainLooper()) {
+                exoPlayer.videoDisplaySizeOrNull()
+            } else {
+                runBlocking(Dispatchers.Main) {
+                    exoPlayer.videoDisplaySizeOrNull()
+                }
+            } ?: return props
+            return props.copy(videoWidth = displaySize.width, videoHeight = displaySize.height)
+        }
+
+        override val value: MediaProperties? get() = patchProperties(exoMediampPlayer.mediaProperties.value)
+        override val replayCache: List<MediaProperties?> get() = listOf(value)
+        override suspend fun collect(collector: FlowCollector<MediaProperties?>): Nothing =
+            exoMediampPlayer.mediaProperties.collect { props ->
+                collector.emit(patchProperties(props))
+            }
+    }
+
     override fun seekTo(positionMillis: Long) {
         exoMediampPlayer.seekTo(positionMillis)
         // ExoPlayer applies a seek asynchronously. Update libass immediately as well so the
@@ -306,10 +334,20 @@ private class LibassMediaSourcePipeline(
 
     private fun createLibassMediaSource(data: MediaData): MediaSource? {
         val dataSourceFactory = when (data) {
-            is UriMediaData -> DefaultHttpDataSource.Factory()
-                .setUserAgent(data.headers["User-Agent"] ?: DEFAULT_USER_AGENT)
-                .setDefaultRequestProperties(data.headers)
-                .setConnectTimeoutMs(CONNECT_TIMEOUT_MILLIS)
+            is UriMediaData -> {
+                val scheme = Uri.parse(data.uri).scheme
+                if (scheme == "http" || scheme == "https") {
+                    DefaultHttpDataSource.Factory()
+                        .setUserAgent(data.headers["User-Agent"] ?: DEFAULT_USER_AGENT)
+                        .setDefaultRequestProperties(data.headers)
+                        .setConnectTimeoutMs(CONNECT_TIMEOUT_MILLIS)
+                        .setAllowCrossProtocolRedirects(true)
+                } else {
+                    // Non-HTTP URIs (content:// from local imports, file://, etc.) are served by
+                    // DefaultDataSource (ContentDataSource is seekable via AssetFileDescriptor).
+                    DefaultDataSource.Factory(context)
+                }
+            }
 
             is SeekableInputMediaData -> {
                 if (data.uri.startsWith("file://")) {
@@ -336,6 +374,12 @@ private class LibassMediaSourcePipeline(
 
         val mediaItem = MediaItem.Builder()
             .setUri(data.playbackUri)
+            .apply {
+                val uriStr = data.playbackUri.lowercase()
+                if (uriStr.contains(".mkv") || uriStr.contains("container=mkv") || uriStr.contains("format=mkv")) {
+                    setMimeType(MimeTypes.APPLICATION_MATROSKA)
+                }
+            }
             .setSubtitleConfigurations(
                 data.extraFiles.subtitles.mapIndexed { index, subtitle ->
                     MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.uri)).apply {
@@ -468,6 +512,14 @@ class LibassExoPlayerMediampPlayerFactory(
             audioTimeStretch,
             configurePlayerBuilder = { builder ->
                 builder.setLoadControl(aniExoPlayerLoadControl())
+                // 自带渲染器工厂: 注册 FLAC 软解渲染器, 并在高质量变速时安装 WSOLA 处理器链
+                // (mediamp 的内部工厂是 internal 且不含 FLAC 软解, 只能整体替换).
+                builder.setRenderersFactory(
+                    AniRenderersFactory(
+                        context,
+                        highQualityTimeStretch = audioTimeStretch == ExoPlayerAudioTimeStretch.HighQualityWsola,
+                    ),
+                )
             },
         )
     }

@@ -17,6 +17,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
+import me.him188.ani.android.AniApplication
+import me.him188.ani.app.domain.media.cache.engine.AlwaysUseTorrentEngineAccess
+import me.him188.ani.app.domain.torrent.TorrentEngine
 import me.him188.ani.android.navigation.AndroidBrowserNavigator
 import me.him188.ani.android.provider.ExternalContentProviderFactoryImpl
 import me.him188.ani.app.data.persistent.database.AniDatabase
@@ -30,9 +33,11 @@ import me.him188.ani.app.domain.media.cache.engine.TorrentMediaCacheEngine
 import me.him188.ani.app.domain.media.cache.storage.MediaSaveDirProvider
 import me.him188.ani.app.domain.media.download.MediaDownloadManager
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
+import me.him188.ani.app.domain.media.hls.HlsPlaybackPreparer
+import me.him188.ani.app.domain.media.hls.PlatformHlsPlaybackPreparer
+import me.him188.ani.app.domain.media.resolver.AndroidLocalFileMediaResolver
 import me.him188.ani.app.domain.media.resolver.AndroidWebMediaResolver
 import me.him188.ani.app.domain.media.resolver.HttpStreamingMediaResolver
-import me.him188.ani.app.domain.media.resolver.LocalFileMediaResolver
 import me.him188.ani.app.domain.media.resolver.MediaResolver
 import me.him188.ani.app.domain.mediasource.web.AndroidOnnxImageCaptchaRecognizer
 import me.him188.ani.app.domain.mediasource.web.captcha.AndroidCaptchaBrowserFactory
@@ -80,15 +85,19 @@ import kotlin.system.exitProcess
  * 手机 flavor 专属绑定; 与 TV 共用的绑定见交集源集 `src/main` 的 [getCommonAndroidModules].
  */
 fun getAndroidModules(
-    serviceConnectionManager: TorrentServiceConnectionManager,
+    serviceConnectionManager: TorrentServiceConnectionManager?,
     coroutineScope: CoroutineScope,
 ) = module {
     single<BrowserNavigator> { AndroidBrowserNavigator() }
     single<CaptchaBrowserFactory> { AndroidCaptchaBrowserFactory(androidContext()) }
     single<ImageCaptchaRecognizer> { AndroidOnnxImageCaptchaRecognizer() }
 
-    single<TorrentEngineAccess> { serviceConnectionManager }
-    single<TorrentServiceConnection<IRemoteAniTorrentEngine>> { serviceConnectionManager.connection }
+    if (serviceConnectionManager != null) {
+        single<TorrentEngineAccess> { serviceConnectionManager }
+        single<TorrentServiceConnection<IRemoteAniTorrentEngine>> { serviceConnectionManager.connection }
+    } else {
+        single<TorrentEngineAccess> { AlwaysUseTorrentEngineAccess }
+    }
 
     single<MediaSaveDirProvider> {
         val context = androidContext()
@@ -132,16 +141,22 @@ fun getAndroidModules(
         val saveDir = get<MediaSaveDirProvider>().saveDir
         logger.info { "TorrentManager base save directory: $saveDir" }
 
-        DefaultTorrentManager.create(
-            coroutineScope.coroutineContext,
-            get(),
-            client = get<HttpClientProvider>().get(ScopedHttpClientUserAgent.ANI),
-            get(),
-            get(),
-            baseSaveDir = { Path(saveDir).inSystem },
-            RemoteAnitorrentEngineFactory(get(), get(), get<ProxyProvider>().proxy),
-            pikpak = get<PikPakEngine>(),
-        )
+        if (serviceConnectionManager != null && AniApplication.FEATURE_USE_TORRENT_SERVICE) {
+            DefaultTorrentManager.create(
+                coroutineScope.coroutineContext,
+                get(),
+                client = get<HttpClientProvider>().get(ScopedHttpClientUserAgent.ANI),
+                get(),
+                get(),
+                baseSaveDir = { Path(saveDir).inSystem },
+                RemoteAnitorrentEngineFactory(get(), get(), get<ProxyProvider>().proxy),
+                pikpak = get<PikPakEngine>(),
+            )
+        } else {
+            object : TorrentManager {
+                override val engines: List<TorrentEngine> = emptyList()
+            }
+        }
     }
 
     single<HttpMediaCacheEngine> {
@@ -162,7 +177,7 @@ fun getAndroidModules(
     factory<MediaResolver> {
         MediaResolver.from(
             torrentMediaResolvers(get<TorrentManager>().engines, get())
-                .plus(LocalFileMediaResolver())
+                .plus(AndroidLocalFileMediaResolver())
                 .plus(HttpStreamingMediaResolver())
                 .plus(
                     AndroidWebMediaResolver(
@@ -180,10 +195,12 @@ fun getAndroidModules(
             override fun exitApp(context: ContextMP, status: Int): Nothing {
                 runBlocking(Dispatchers.Main.immediate) {
                     (context.findActivity() as? AniComponentActivity)?.finishAffinity()
-                    context.startService(
-                        Intent(context, AniTorrentService.actualServiceClass)
-                            .apply { putExtra("stopService", true) },
-                    )
+                    if (AniApplication.FEATURE_USE_TORRENT_SERVICE) {
+                        context.startService(
+                            Intent(context, AniTorrentService.actualServiceClass)
+                                .apply { putExtra("stopService", true) },
+                        )
+                    }
                     exitProcess(status)
                 }
             }

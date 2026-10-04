@@ -312,8 +312,8 @@ private fun EpisodeScreenContent(
         }
     }
 
-    LaunchedEffect(vm.isFullscreen) {
-        // Update system bar visibility whenever fullscreen state changes
+    LaunchedEffect(context, window, window.deviceOrientation, vm.isFullscreen) {
+        // 系统栏可见性与全屏状态和当前窗口方向保持同步.
         context.setSystemBarVisible(window, !vm.isFullscreen)
     }
 
@@ -832,6 +832,8 @@ private fun EpisodeScreenPhoneDetails(
                     },
                     modifier = Modifier.fillMaxSize(),
                     danmakuListState = vm.danmakuListState.collectAsStateWithLifecycle().value,
+                    onCacheDanmaku = { vm.cacheCurrentDanmaku() },
+                    isCachingDanmaku = vm.isCachingDanmaku.collectAsStateWithLifecycle<Boolean>().value,
                     onBeforeOpenMediaSelector = {
                         if (vm.mediaSelectorMode == null && !page.isLoading) {
                             vm.mediaSelectorMode = page.initialMediaSelectorMode

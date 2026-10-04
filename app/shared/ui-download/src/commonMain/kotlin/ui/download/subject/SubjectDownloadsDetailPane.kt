@@ -45,9 +45,10 @@ fun SubjectDownloadsDetailPane(
             modifier = modifier,
             contentPadding = contentPadding,
             singlePane = singlePane,
+            danmaku = SubjectDanmakuBatchUi(),
         )
     } else {
-        SubjectDownloadsHost(presenter) { state, actions, sourceInfo ->
+        SubjectDownloadsHost(presenter) { state, actions, sourceInfo, danmaku ->
             SubjectDownloadsDetailPaneContent(
                 state = state,
                 actions = actions,
@@ -58,6 +59,7 @@ fun SubjectDownloadsDetailPane(
                 modifier = modifier,
                 contentPadding = contentPadding,
                 singlePane = singlePane,
+                danmaku = danmaku,
             )
         }
     }
@@ -74,6 +76,7 @@ private fun SubjectDownloadsDetailPaneContent(
     modifier: Modifier,
     contentPadding: PaddingValues,
     singlePane: Boolean,
+    danmaku: SubjectDanmakuBatchUi,
 ) {
     SubjectDownloadsContent(
         state = state,
@@ -85,6 +88,7 @@ private fun SubjectDownloadsDetailPaneContent(
         modifier = modifier,
         rowShape = if (singlePane) RectangleShape else MaterialTheme.shapes.medium,
         contentPadding = contentPadding,
+        danmaku = danmaku,
         header = {
             if (singlePane) {
                 SubjectDownloadsSummaryRow(
@@ -94,6 +98,9 @@ private fun SubjectDownloadsDetailPaneContent(
                     selectedEntries = state.downloads.filter { it.id in selectionState.selectedIds },
                     onPauseAll = actions.pauseAll,
                     onResumeAll = actions.resumeAll,
+                    danmakuBatchState = danmaku.batchState,
+                    missingDanmakuEpisodeCount = danmaku.missingEpisodeCount,
+                    onCacheAllDanmaku = danmaku.onCacheAll,
                 )
             } else {
                 SubjectDownloadsHeader(
@@ -102,6 +109,9 @@ private fun SubjectDownloadsDetailPaneContent(
                     totalEpisodeCount = state.totalEpisodes,
                     onPauseAll = actions.pauseAll,
                     onResumeAll = actions.resumeAll,
+                    danmakuBatchState = danmaku.batchState,
+                    missingDanmakuEpisodeCount = danmaku.missingEpisodeCount,
+                    onCacheAllDanmaku = danmaku.onCacheAll,
                 )
             }
         },
