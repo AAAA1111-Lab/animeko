@@ -24,6 +24,8 @@ import kotlinx.coroutines.withTimeout
 import me.him188.ani.app.data.models.preference.DanmakuCacheStrategy
 import me.him188.ani.app.data.network.danmaku.AniDanmakuProvider
 import me.him188.ani.app.data.network.danmaku.AniDanmakuSender
+import me.him188.ani.app.data.persistent.database.dao.CachedDanmakuEpisode
+import me.him188.ani.app.data.persistent.database.dao.DanmakuCacheOrigin
 import me.him188.ani.app.data.persistent.database.dao.DanmakuDao
 import me.him188.ani.app.data.persistent.database.dao.DanmakuEntity
 import me.him188.ani.app.data.persistent.database.dao.LocalDanmakuProvider
@@ -55,6 +57,7 @@ import me.him188.ani.utils.logging.debug
 import me.him188.ani.utils.logging.error
 import me.him188.ani.utils.logging.info
 import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.platform.currentTimeMillis
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
@@ -119,6 +122,26 @@ class DanmakuRepository(
         return count
     }
 
+    /**
+     * 有弹幕缓存的剧集, 连带条目与剧集名称, 供设置-存储里的弹幕缓存管理使用.
+     */
+    fun cachedDanmakuEpisodesFlow(): Flow<List<CachedDanmakuEpisode>> =
+        danmakuDao.cachedDanmakuEpisodesFlow()
+
+    /**
+     * 删除某一集的弹幕缓存, 不论手动还是自动. 这是用户在存储设置里的显式操作.
+     */
+    suspend fun removeCachedDanmaku(subjectId: Int, episodeId: Int) {
+        danmakuDao.deleteBySubjectAndEpisode(subjectId, episodeId)
+    }
+
+    /**
+     * 删除一个条目的全部弹幕缓存, 不论手动还是自动.
+     */
+    suspend fun removeCachedDanmakuOfSubject(subjectId: Int) {
+        danmakuDao.deleteBySubject(subjectId)
+    }
+
     fun getInteractiveDanmakuFetcherOrNull(providerId: DanmakuProviderId): DanmakuFetcher? {
         return remoteProviders
             .firstOrNull { it is MatchingDanmakuProvider && it.providerId == providerId }
@@ -145,13 +168,13 @@ class DanmakuRepository(
     fun cacheDanmakuIfNeeded(request: DanmakuFetchRequest) = backgroundScope.launch {
         if (shouldCache(request.subjectId, request.episodeId)) {
             val remotes = fetchFromAllRemotes(request)
-            saveToLocal(request.subjectId, request.episodeId, remotes.first())
+            saveToLocal(request.subjectId, request.episodeId, remotes.first(), DanmakuCacheOrigin.AUTO)
         }
     }
 
     fun cacheDanmakuIfNeeded(subjectId: Int, episodeId: Int, list: List<DanmakuFetchResult>) = backgroundScope.launch {
         if (shouldCache(subjectId, episodeId)) {
-            saveToLocal(subjectId, episodeId, list)
+            saveToLocal(subjectId, episodeId, list, DanmakuCacheOrigin.AUTO)
         }
     }
 
@@ -159,13 +182,13 @@ class DanmakuRepository(
      * 显式把已取到的弹幕写入本地缓存, 不检查 [shouldCache].
      *
      * 与 [cacheDanmakuIfNeeded] 的区别在于: 前者是用户主动要求的动作, 策略只决定"自动缓存"的行为,
-     * 不应该让用户点了没有反应.
+     * 不应该让用户点了没有反应. 写入的内容标记为 [DanmakuCacheOrigin.MANUAL], 之后不会被自动清理删除.
      *
      * 与 [cacheDanmakuIfNeeded] 相同的是仍然忽略 [DanmakuProviderId.Local] 的数据源, 它的内容本来就来自
      * 本地缓存, 再写回去只会把[presentationServiceId] 覆盖成 `Local`.
      */
     suspend fun saveToLocalCache(subjectId: Int, episodeId: Int, list: List<DanmakuFetchResult>) {
-        saveToLocal(subjectId, episodeId, list)
+        saveToLocal(subjectId, episodeId, list, DanmakuCacheOrigin.MANUAL)
     }
 
     /**
@@ -178,31 +201,67 @@ class DanmakuRepository(
      */
     suspend fun fetchAndCacheNow(request: DanmakuFetchRequest): Int {
         val results = fetchFromAllRemotes(request).first()
-        saveToLocal(request.subjectId, request.episodeId, results)
+        saveToLocal(request.subjectId, request.episodeId, results, DanmakuCacheOrigin.MANUAL)
         return results.sumOf { it.list.size }
     }
 
+    /**
+     * 该剧集的弹幕不再需要缓存时, 删除**自动缓存**的部分.
+     *
+     * 手动缓存([DanmakuCacheOrigin.MANUAL])不在此处删除: 它是用户的显式选择, 只由用户在设置-存储里
+     * 或"清空弹幕缓存"主动清理.
+     */
     fun deleteDanmakuIfDontNeeded(subjectId: Int, episodeId: Int) = backgroundScope.launch {
         if (!shouldCache(subjectId, episodeId)) {
-            logger.info { "deleteBySubjectAndEpisode, subjectId: $subjectId, episodeId: $episodeId" }
-            danmakuDao.deleteBySubjectAndEpisode(subjectId, episodeId)
+            logger.info { "deleteAutoDanmaku, subjectId: $subjectId, episodeId: $episodeId" }
+            danmakuDao.deleteAutoBySubjectAndEpisode(subjectId, episodeId)
         }
     }
 
     private suspend fun saveToLocal(
         subjectId: Int,
         episodeId: Int,
-        list: List<DanmakuFetchResult>
+        list: List<DanmakuFetchResult>,
+        origin: DanmakuCacheOrigin,
     ) {
+        // 自动写入不能把已有的手动缓存降级成自动缓存, 否则自动清理就会把用户主动缓存的内容删掉.
+        val manualIds = if (origin == DanmakuCacheOrigin.AUTO) {
+            danmakuDao.manualDanmakuIds(subjectId, episodeId).toHashSet()
+        } else {
+            emptySet()
+        }
         val entriesWithoutLocalSource = list
             .filter { it.providerId != DanmakuProviderId.Local }
-            .flatMap { it.toEntityList(subjectId, episodeId) }
-        logger.info { "saveToLocal, subjectId: $subjectId, episodeId: $episodeId, danmaku size: ${entriesWithoutLocalSource.size}" }
+            .flatMap { it.toEntityList(subjectId, episodeId, origin, manualIds, currentTimeMillis()) }
+        logger.info { "saveToLocal, subjectId: $subjectId, episodeId: $episodeId, origin: $origin, danmaku size: ${entriesWithoutLocalSource.size}" }
 
         if (entriesWithoutLocalSource.isNotEmpty()) {
             danmakuDao.upsertAll(entriesWithoutLocalSource)
-            // todo: db 里可能有已经被删除的弹幕, 可能需要清理一下
         }
+        if (origin == DanmakuCacheOrigin.AUTO) {
+            evictExcessAutoCache()
+        }
+    }
+
+    /**
+     * 自动缓存的剧集数超过设置上限时, 按最近一次缓存时间从早到晚淘汰, 直到回到上限之内.
+     *
+     * 只淘汰 [DanmakuCacheOrigin.AUTO] 的行; 手动缓存的剧集不参与, 也不计入上限 —— 它们由用户显式
+     * 选择, 只在设置-存储里主动清理.
+     */
+    private suspend fun evictExcessAutoCache() {
+        val maxEpisodes = settingsRepository.mediaCacheSettings.flow.first().maxAutoCachedDanmakuEpisodes
+        if (maxEpisodes <= 0) return
+
+        val cached = danmakuDao.autoCachedEpisodesByAge()
+        val excess = cached.size - maxEpisodes
+        if (excess <= 0) return
+
+        val victims = cached.take(excess)
+        victims.forEach {
+            danmakuDao.deleteAutoBySubjectAndEpisode(it.subjectId, it.episodeId)
+        }
+        logger.info { "evictExcessAutoCache, 上限 $maxEpisodes, 淘汰 ${victims.size} 集" }
     }
 
     /**
@@ -242,7 +301,13 @@ class DanmakuRepository(
         }
     }
 
-    private fun DanmakuFetchResult.toEntityList(subjectId: Int, episodeId: Int): List<DanmakuEntity> {
+    private fun DanmakuFetchResult.toEntityList(
+        subjectId: Int,
+        episodeId: Int,
+        origin: DanmakuCacheOrigin,
+        manualIds: Set<String>,
+        cachedAtMillis: Long,
+    ): List<DanmakuEntity> {
         return list.map {
             DanmakuEntity(
                 id = it.id,
@@ -251,6 +316,8 @@ class DanmakuRepository(
                 serviceId = it.serviceId,
                 presentationServiceId = matchInfo.serviceId,
                 senderId = it.senderId,
+                origin = if (it.id in manualIds) DanmakuCacheOrigin.MANUAL else origin,
+                cachedAtMillis = cachedAtMillis,
                 content = it.content,
             )
         }

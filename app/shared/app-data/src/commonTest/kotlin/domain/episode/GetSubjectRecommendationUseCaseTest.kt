@@ -12,11 +12,15 @@ package me.him188.ani.app.domain.episode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
-import me.him188.ani.app.data.models.BangumiSyncState
-import me.him188.ani.app.data.models.SubjectCollectionCounts
+import me.him188.ani.app.data.models.bangumi.BangumiSyncState
+import me.him188.ani.app.data.models.subject.SubjectCollectionCounts
 import me.him188.ani.app.data.models.subject.SubjectInfo
+import me.him188.ani.app.data.network.BatchSubjectRelations
 import me.him188.ani.app.data.network.SubjectService
+import me.him188.ani.client.models.AniSubjectCollection
 import me.him188.ani.client.models.AniSubjectRecommendation
+import me.him188.ani.client.models.AniUpdateSubjectCollectionRequest
+import me.him188.ani.datasources.bangumi.models.BangumiSubjectCollectionType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -31,8 +35,26 @@ class GetSubjectRecommendationUseCaseTest {
             return recommendations
         }
 
-        override suspend fun getSubject(subjectId: Int): SubjectInfo? = null
-        override suspend fun setSubjectCollection(subjectId: Int, type: Int, tags: List<String>, comment: String?, rate: Int?, private: Boolean) {}
+        override suspend fun getSubjectCollections(
+            type: BangumiSubjectCollectionType?,
+            offset: Int,
+            limit: Int,
+        ): List<AniSubjectCollection> = error("not used")
+
+        override suspend fun getSubjectCollection(subjectId: Int): AniSubjectCollection? = error("not used")
+
+        override suspend fun getSubjectRelations(
+            subjectId: Int,
+            withCharacterActors: Boolean,
+        ): BatchSubjectRelations = error("not used")
+
+        override fun subjectCollectionById(subjectId: Int): Flow<AniSubjectCollection?> = emptyFlow()
+
+        override suspend fun patchSubjectCollection(
+            subjectId: Int,
+            payload: AniUpdateSubjectCollectionRequest,
+        ) = error("not used")
+
         override suspend fun deleteSubjectCollection(subjectId: Int) {}
         override fun subjectCollectionCountsFlow(): Flow<SubjectCollectionCounts> = emptyFlow()
         override suspend fun performBangumiFullSync() {}

@@ -1835,6 +1835,22 @@
     <string name="qr_login_close">关闭</string>
     <string name="subject_episode_danmaku_sources_title">来源与时间校准</string>
     <string name="subject_episode_danmaku_sources_empty">暂无可用弹幕源</string>
+    <string name="settings_storage_danmaku_cache_title">弹幕缓存</string>
+    <string name="settings_storage_danmaku_cache_limit_title">自动缓存上限</string>
+    <string name="settings_storage_danmaku_cache_limit_description">自动缓存的剧集超过上限时，按缓存时间淘汰最早的。手动缓存的剧集不计入，也不会被淘汰。</string>
+    <string name="settings_storage_danmaku_cache_limit_unlimited">不限制</string>
+    <string name="settings_storage_danmaku_cache_limit_value">%1$d 集</string>
+    <string name="settings_storage_danmaku_cache_manage_title">按剧集管理</string>
+    <string name="settings_storage_danmaku_cache_manage_empty">还没有缓存任何弹幕</string>
+    <string name="settings_storage_danmaku_cache_manage_subject">%1$d 集 · %2$d 条</string>
+    <string name="settings_storage_danmaku_cache_manage_count">%1$d 条</string>
+    <string name="settings_storage_danmaku_cache_manage_manual">手动</string>
+    <string name="settings_storage_danmaku_cache_remove_episode_title">删除这一集的弹幕缓存</string>
+    <string name="settings_storage_danmaku_cache_remove_episode_text">将删除「%1$s」的 %2$d 条弹幕，包括手动缓存的内容。</string>
+    <string name="settings_storage_danmaku_cache_remove_subject_title">删除该条目的弹幕缓存</string>
+    <string name="settings_storage_danmaku_cache_remove_subject_text">将删除「%1$s」共 %2$d 集 %3$d 条弹幕，包括手动缓存的内容。</string>
+    <string name="settings_storage_danmaku_cache_remove_done">已删除 %1$d 条弹幕</string>
+    <string name="settings_storage_danmaku_cache_episode_fallback">剧集 %1$d</string>
 </resources>
 
 <!--@formatter:on-->

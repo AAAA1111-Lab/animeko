@@ -12,8 +12,12 @@ package me.him188.ani.app.ui.settings.tabs.media
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
 import me.him188.ani.app.data.models.preference.DanmakuCacheStrategy
 import me.him188.ani.app.data.models.preference.MediaCacheSettings
+import me.him188.ani.app.data.persistent.database.dao.CachedDanmakuEpisode
 import me.him188.ani.app.platform.PermissionManager
 import me.him188.ani.app.ui.foundation.getClipEntryText
 import me.him188.ani.app.ui.foundation.rememberAsyncHandler
@@ -51,10 +56,25 @@ import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_confirm_ti
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_description
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_done
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_clear_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_limit_description
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_limit_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_limit_unlimited
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_limit_value
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_manage_count
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_manage_empty
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_manage_manual
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_manage_subject
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_manage_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_remove_done
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_remove_episode_text
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_remove_episode_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_remove_subject_text
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_remove_subject_title
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_cache_on_collection_doing_media_play
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_cache_on_media_cache
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_description_do_not_cache
 import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_strategy_title
+import me.him188.ani.app.ui.lang.settings_storage_danmaku_cache_title
 import me.him188.ani.app.ui.lang.subject_episode_danmaku_cache_cached
 import me.him188.ani.app.ui.settings.framework.SettingsState
 import me.him188.ani.app.ui.settings.framework.components.DropdownItem
@@ -77,6 +97,18 @@ class CacheDirectoryGroupState(
      * 清空全部弹幕缓存, 返回被清除的条数.
      */
     val onClearDanmakuCache: suspend () -> Int,
+    /**
+     * 有弹幕缓存的剧集, 带条目与剧集名称, 用于按剧集管理弹幕缓存.
+     */
+    val cachedDanmakuEpisodesFlow: Flow<List<CachedDanmakuEpisode>>,
+    /**
+     * 删除某一集的弹幕缓存, 手动与自动一并删除.
+     */
+    val onRemoveDanmakuCacheOfEpisode: suspend (subjectId: Int, episodeId: Int) -> Unit,
+    /**
+     * 删除一个条目的全部弹幕缓存, 手动与自动一并删除.
+     */
+    val onRemoveDanmakuCacheOfSubject: suspend (subjectId: Int) -> Unit,
 )
 
 @Composable
@@ -148,59 +180,227 @@ fun SettingsScope.DanmakuCacheSettings(state: CacheDirectoryGroupState) {
     val tasker = rememberAsyncHandler()
     val toaster = LocalToaster.current
     val cachedDanmakuCount by state.cachedDanmakuCountFlow.collectAsStateWithLifecycle<Int?>(initialValue = null)
-    var showClearDanmakuCacheDialog by remember { mutableStateOf(false) }
-
-    DropdownItem(
-        title = { Text(stringResource(Lang.settings_storage_danmaku_cache_strategy_title)) },
-        selected = { mediaCacheSettings.danmakuCacheStrategy },
-        values = { DanmakuCacheStrategy.entries },
-        description = {
-            Text(
-                when (mediaCacheSettings.danmakuCacheStrategy) {
-                    DanmakuCacheStrategy.DON_NOT_CACHE ->
-                        stringResource(Lang.settings_storage_danmaku_cache_strategy_description_do_not_cache)
-
-                    DanmakuCacheStrategy.CACHE_ON_COLLECTION_DOING_MEDIA_PLAY ->
-                        stringResource(Lang.settings_storage_danmaku_cache_strategy_description_cache_on_collection_doing_media_play)
-
-                    DanmakuCacheStrategy.CACHE_ON_MEDIA_CACHE ->
-                        stringResource(Lang.settings_storage_danmaku_cache_strategy_description_cache_on_media_cache)
-                },
-            )
-        },
-        itemText = { strategy ->
-            Text(
-                when (strategy) {
-                    DanmakuCacheStrategy.DON_NOT_CACHE -> "NONE"
-                    DanmakuCacheStrategy.CACHE_ON_MEDIA_CACHE -> "MEDIA"
-                    DanmakuCacheStrategy.CACHE_ON_COLLECTION_DOING_MEDIA_PLAY -> "COLLECT"
-                },
-            )
-        },
-        onSelect = { newStrategy ->
-            tasker.launch {
-                state.mediaCacheSettingsState.updateSuspended(
-                    mediaCacheSettings.copy(danmakuCacheStrategy = newStrategy),
-                )
-            }
-        },
+    val cachedEpisodes by state.cachedDanmakuEpisodesFlow.collectAsStateWithLifecycle(
+        initialValue = emptyList(),
     )
+    var showClearDanmakuCacheDialog by remember { mutableStateOf(false) }
+    var expandedSubjectId by remember { mutableStateOf<Int?>(null) }
+    var pendingEpisodeRemoval by remember { mutableStateOf<CachedDanmakuEpisode?>(null) }
+    var pendingSubjectRemoval by remember { mutableStateOf<SubjectDanmakuCacheRemoval?>(null) }
 
     val clearTitleText = stringResource(Lang.settings_storage_danmaku_cache_clear_title)
     val clearDescriptionText = stringResource(Lang.settings_storage_danmaku_cache_clear_description)
-    TextItem(
-        title = { Text(clearTitleText) },
-        description = {
-            val count = cachedDanmakuCount
-            if (count != null && count > 0) {
-                Text(stringResource(Lang.subject_episode_danmaku_cache_cached, count))
-            } else {
-                Text(clearDescriptionText)
+
+    Group({ Text(stringResource(Lang.settings_storage_danmaku_cache_title)) }) {
+        DropdownItem(
+            title = { Text(stringResource(Lang.settings_storage_danmaku_cache_strategy_title)) },
+            selected = { mediaCacheSettings.danmakuCacheStrategy },
+            values = { DanmakuCacheStrategy.entries },
+            description = {
+                Text(
+                    when (mediaCacheSettings.danmakuCacheStrategy) {
+                        DanmakuCacheStrategy.DON_NOT_CACHE ->
+                            stringResource(Lang.settings_storage_danmaku_cache_strategy_description_do_not_cache)
+
+                        DanmakuCacheStrategy.CACHE_ON_COLLECTION_DOING_MEDIA_PLAY ->
+                            stringResource(Lang.settings_storage_danmaku_cache_strategy_description_cache_on_collection_doing_media_play)
+
+                        DanmakuCacheStrategy.CACHE_ON_MEDIA_CACHE ->
+                            stringResource(Lang.settings_storage_danmaku_cache_strategy_description_cache_on_media_cache)
+                    },
+                )
+            },
+            itemText = { strategy ->
+                Text(
+                    when (strategy) {
+                        DanmakuCacheStrategy.DON_NOT_CACHE -> "NONE"
+                        DanmakuCacheStrategy.CACHE_ON_MEDIA_CACHE -> "MEDIA"
+                        DanmakuCacheStrategy.CACHE_ON_COLLECTION_DOING_MEDIA_PLAY -> "COLLECT"
+                    },
+                )
+            },
+            onSelect = { newStrategy ->
+                tasker.launch {
+                    state.mediaCacheSettingsState.updateSuspended(
+                        mediaCacheSettings.copy(danmakuCacheStrategy = newStrategy),
+                    )
+                }
+            },
+        )
+
+        // 上限只作用于自动缓存, 手动缓存的剧集既不计数也不参与淘汰.
+        val limitUnlimitedText = stringResource(Lang.settings_storage_danmaku_cache_limit_unlimited)
+        DropdownItem(
+            title = { Text(stringResource(Lang.settings_storage_danmaku_cache_limit_title)) },
+            selected = { mediaCacheSettings.maxAutoCachedDanmakuEpisodes },
+            values = { DANMAKU_AUTO_CACHE_LIMIT_CHOICES },
+            description = { Text(stringResource(Lang.settings_storage_danmaku_cache_limit_description)) },
+            itemText = { limit ->
+                if (limit == 0) {
+                    Text(limitUnlimitedText)
+                } else {
+                    Text(stringResource(Lang.settings_storage_danmaku_cache_limit_value, limit))
+                }
+            },
+            onSelect = { newLimit ->
+                tasker.launch {
+                    state.mediaCacheSettingsState.updateSuspended(
+                        mediaCacheSettings.copy(maxAutoCachedDanmakuEpisodes = newLimit),
+                    )
+                }
+            },
+        )
+
+        TextItem(
+            title = { Text(clearTitleText) },
+            description = {
+                val count = cachedDanmakuCount
+                if (count != null && count > 0) {
+                    Text(stringResource(Lang.subject_episode_danmaku_cache_cached, count))
+                } else {
+                    Text(clearDescriptionText)
+                }
+            },
+            onClick = { showClearDanmakuCacheDialog = true },
+            onClickEnabled = (cachedDanmakuCount ?: 0) > 0,
+        )
+    }
+
+    Group({ Text(stringResource(Lang.settings_storage_danmaku_cache_manage_title)) }) {
+        if (cachedEpisodes.isEmpty()) {
+            TextItem(
+                title = { Text(stringResource(Lang.settings_storage_danmaku_cache_manage_empty)) },
+                onClickEnabled = false,
+            )
+        } else {
+            cachedEpisodes.groupBy { it.subjectId }.forEach { (subjectId, episodes) ->
+                val expanded = expandedSubjectId == subjectId
+                TextItem(
+                    title = { Text(episodes.first().subjectDisplayName(subjectId)) },
+                    description = {
+                        Text(
+                            stringResource(
+                                Lang.settings_storage_danmaku_cache_manage_subject,
+                                episodes.size,
+                                episodes.sumOf { it.count },
+                            ),
+                        )
+                    },
+                    icon = {
+                        Icon(
+                            if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                        )
+                    },
+                    action = {
+                        IconButton({
+                            pendingSubjectRemoval = SubjectDanmakuCacheRemoval(
+                                subjectId = subjectId,
+                                displayName = episodes.first().subjectDisplayName(subjectId),
+                                episodeCount = episodes.size,
+                                danmakuCount = episodes.sumOf { it.count },
+                            )
+                        }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = null)
+                        }
+                    },
+                    onClick = { expandedSubjectId = if (expanded) null else subjectId },
+                )
+                if (expanded) {
+                    episodes.sortedBy { it.episodeSort ?: Double.MAX_VALUE }.forEach { episode ->
+                        TextItem(
+                            title = { Text(episode.episodeDisplayName()) },
+                            description = {
+                                val countText = stringResource(
+                                    Lang.settings_storage_danmaku_cache_manage_count,
+                                    episode.count,
+                                )
+                                if (episode.hasManual) {
+                                    Text(
+                                        "$countText · " +
+                                                stringResource(Lang.settings_storage_danmaku_cache_manage_manual),
+                                    )
+                                } else {
+                                    Text(countText)
+                                }
+                            },
+                            action = {
+                                IconButton({ pendingEpisodeRemoval = episode }) {
+                                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                                }
+                            },
+                        )
+                    }
+                }
             }
-        },
-        onClick = { showClearDanmakuCacheDialog = true },
-        onClickEnabled = (cachedDanmakuCount ?: 0) > 0,
-    )
+        }
+    }
+
+    pendingEpisodeRemoval?.let { episode ->
+        AlertDialog(
+            onDismissRequest = { pendingEpisodeRemoval = null },
+            icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(Lang.settings_storage_danmaku_cache_remove_episode_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        Lang.settings_storage_danmaku_cache_remove_episode_text,
+                        episode.episodeDisplayName(),
+                        episode.count,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    pendingEpisodeRemoval = null
+                    tasker.launch { state.onRemoveDanmakuCacheOfEpisode(episode.subjectId, episode.episodeId) }
+                }) {
+                    Text(stringResource(Lang.settings_danmaku_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton({ pendingEpisodeRemoval = null }) {
+                    Text(stringResource(Lang.settings_danmaku_cancel))
+                }
+            },
+        )
+    }
+
+    pendingSubjectRemoval?.let { removal ->
+        AlertDialog(
+            onDismissRequest = { pendingSubjectRemoval = null },
+            icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(Lang.settings_storage_danmaku_cache_remove_subject_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        Lang.settings_storage_danmaku_cache_remove_subject_text,
+                        removal.displayName,
+                        removal.episodeCount,
+                        removal.danmakuCount,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    pendingSubjectRemoval = null
+                    tasker.launch {
+                        state.onRemoveDanmakuCacheOfSubject(removal.subjectId)
+                        toaster.toast(
+                            getString(Lang.settings_storage_danmaku_cache_remove_done, removal.danmakuCount),
+                        )
+                    }
+                }) {
+                    Text(stringResource(Lang.settings_danmaku_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton({ pendingSubjectRemoval = null }) {
+                    Text(stringResource(Lang.settings_danmaku_cancel))
+                }
+            },
+        )
+    }
 
     if (showClearDanmakuCacheDialog) {
         AlertDialog(
@@ -231,6 +431,28 @@ fun SettingsScope.DanmakuCacheSettings(state: CacheDirectoryGroupState) {
         )
     }
 }
+
+/**
+ * 自动缓存上限的候选值. `0` 表示不限制.
+ */
+private val DANMAKU_AUTO_CACHE_LIMIT_CHOICES = listOf(0, 50, 100, 200, 500, 1000)
+
+private class SubjectDanmakuCacheRemoval(
+    val subjectId: Int,
+    val displayName: String,
+    val episodeCount: Int,
+    val danmakuCount: Int,
+)
+
+private fun CachedDanmakuEpisode.subjectDisplayName(fallbackId: Int): String =
+    subjectNameCn?.takeIf { it.isNotBlank() }
+        ?: subjectName?.takeIf { it.isNotBlank() }
+        ?: fallbackId.toString()
+
+private fun CachedDanmakuEpisode.episodeDisplayName(): String =
+    episodeNameCn?.takeIf { it.isNotBlank() }
+        ?: episodeName?.takeIf { it.isNotBlank() }
+        ?: episodeId.toString()
 
 @Composable
 expect fun SettingsScope.CacheDirectoryGroup(

@@ -1795,6 +1795,22 @@
     <string name="qr_login_close">Close</string>
     <string name="subject_episode_danmaku_sources_title">Sources and timing</string>
     <string name="subject_episode_danmaku_sources_empty">No danmaku sources available</string>
+    <string name="settings_storage_danmaku_cache_title">Danmaku cache</string>
+    <string name="settings_storage_danmaku_cache_limit_title">Automatic cache limit</string>
+    <string name="settings_storage_danmaku_cache_limit_description">When automatic caching exceeds the limit, the oldest episodes are evicted first. Episodes you cached manually are neither counted nor evicted.</string>
+    <string name="settings_storage_danmaku_cache_limit_unlimited">Unlimited</string>
+    <string name="settings_storage_danmaku_cache_limit_value">%1$d episodes</string>
+    <string name="settings_storage_danmaku_cache_manage_title">Manage by episode</string>
+    <string name="settings_storage_danmaku_cache_manage_empty">No danmaku cached yet</string>
+    <string name="settings_storage_danmaku_cache_manage_subject">%1$d episodes · %2$d danmaku</string>
+    <string name="settings_storage_danmaku_cache_manage_count">%1$d danmaku</string>
+    <string name="settings_storage_danmaku_cache_manage_manual">Manual</string>
+    <string name="settings_storage_danmaku_cache_remove_episode_title">Delete this episode’s danmaku cache</string>
+    <string name="settings_storage_danmaku_cache_remove_episode_text">Deletes the %2$d danmaku cached for “%1$s”, including manually cached ones.</string>
+    <string name="settings_storage_danmaku_cache_remove_subject_title">Delete this subject’s danmaku cache</string>
+    <string name="settings_storage_danmaku_cache_remove_subject_text">Deletes the %3$d danmaku cached for %2$d episodes of “%1$s”, including manually cached ones.</string>
+    <string name="settings_storage_danmaku_cache_remove_done">Deleted %1$d danmaku</string>
+    <string name="settings_storage_danmaku_cache_episode_fallback">Episode %1$d</string>
 </resources>
 
 <!--@formatter:on-->

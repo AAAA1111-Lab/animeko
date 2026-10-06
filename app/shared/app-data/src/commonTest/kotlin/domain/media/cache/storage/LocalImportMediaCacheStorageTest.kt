@@ -66,8 +66,8 @@ class LocalImportMediaCacheStorageTest {
 
         val list = storage.listFlow.first()
         assertEquals(2, list.size)
-        assertEquals(1, list[0].cache.metadata.episodeSort.number?.toInt())
-        assertEquals(2, list[1].cache.metadata.episodeSort.number?.toInt())
+        assertEquals(1, list[0].metadata.episodeSort.number?.toInt())
+        assertEquals(2, list[1].metadata.episodeSort.number?.toInt())
 
         val savedInDatastore = dataStore.data.first()
         assertEquals(2, savedInDatastore.size)

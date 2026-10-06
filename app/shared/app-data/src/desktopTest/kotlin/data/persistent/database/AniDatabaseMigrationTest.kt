@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  * AniDatabase 迁移测试 (infra#10, P0#18).
  *
  * 生产迁移链 (CommonKoinModule): 1..15 destructive, 16 起走
- * AutoMigration 16→17→18→19, 手动 [MIGRATION_19_20], AutoMigration 20→21→22→23→24→25→26→27.
+ * AutoMigration 16→17→18→19, 手动 [MIGRATION_19_20], AutoMigration 20→21→22→23→24→25→26→27→28.
  *
  * [MigrationTestHelper] 从 `schemas/<db fqn>/<version>.json` 建旧版本库,
  * runMigrationsAndValidate 会把迁移后的实际 schema 与目标版本 json 逐表逐列校验.
@@ -229,6 +229,46 @@ class AniDatabaseMigrationTest {
         }
         helper.runMigrationsAndValidate(27, emptyList()).use { connection ->
             assertContains(connection.tableNames(), "episode_collection_pending_op")
+        }
+    }
+
+    @Test
+    fun `MIG-10 v27到v28的AutoMigration为danmaku增加来源与缓存时间且旧行按手动缓存保留`() {
+        val helper = createHelper()
+        helper.createDatabase(27).use { connection ->
+            connection.execSQL(
+                "INSERT INTO `subject_collection` (`subjectId`, `name`, `nameCn`, `summary`, `nsfw`, `imageLarge`, " +
+                        "`totalEpisodes`, `airDate`, `aliases`, `tags`, `completeDate`, `collectionType`, " +
+                        "`collection_stats_wish`, `collection_stats_doing`, `collection_stats_done`, `collection_stats_onHold`, " +
+                        "`collection_stats_dropped`, `rating_rank`, `rating_total`, `rating_score`, `rating_count_s1`, " +
+                        "`rating_count_s2`, `rating_count_s3`, `rating_count_s4`, `rating_count_s5`, `rating_count_s6`, " +
+                        "`rating_count_s7`, `rating_count_s8`, `rating_count_s9`, `rating_count_s10`, `self_rating_score`, " +
+                        "`self_rating_tags`, `self_rating_isPrivate`) VALUES (1, 'n', 'cn', '', 0, '', 12, 0, X'5B5D', X'5B5D', 0, " +
+                        "'DOING', 0, 0, 0, 0, 0, 0, 0, '0', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, X'5B5D', 0)",
+            )
+            connection.execSQL(
+                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeSort`, `episodeEp`, `episodeName`, " +
+                        "`imageMedium`, `imageLarge`, `type`, `episodeType`, `hasPublished`, `isKnownCompleted`) " +
+                        "VALUES (1, 11, 1, 1, 'ep', NULL, NULL, 'MAIN', 'NUMBER', 1, 0)",
+            )
+            connection.execSQL(
+                "INSERT INTO `danmaku` (`id`, `subjectId`, `episodeId`, `serviceId`, `presentationServiceId`, " +
+                        "`senderId`, `content_playTimeMillis`, `content_color`, `content_text`, `content_location`) " +
+                        "VALUES ('d1', 1, 11, 's', 's', 'sender', 1000, 0, 'text', 'NORMAL')",
+            )
+        }
+        helper.runMigrationsAndValidate(28, emptyList()).use { connection ->
+            assertContains(connection.columnNames("danmaku"), "origin")
+            assertContains(connection.columnNames("danmaku"), "cachedAtMillis")
+            connection.prepare(
+                "SELECT `origin`, `cachedAtMillis`, `content_text` FROM `danmaku` WHERE `id` = 'd1'",
+            ).use { statement ->
+                assertTrue(statement.step())
+                // 迁移前无法判断来源, 存量行按手动缓存处理, 因此不会被自动清理删掉; 其余数据保留.
+                assertEquals("MANUAL", statement.getText(0))
+                assertEquals(0L, statement.getLong(1))
+                assertEquals("text", statement.getText(2))
+            }
         }
     }
 

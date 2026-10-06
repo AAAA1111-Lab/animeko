@@ -33,6 +33,14 @@ data class MediaCacheSettings(
      */
     val danmakuCacheStrategy: DanmakuCacheStrategy = DanmakuCacheStrategy.CACHE_ON_MEDIA_CACHE,
 
+    /**
+     * 最多保留多少集的**自动**弹幕缓存, 超出后按最近缓存时间淘汰最早的剧集.
+     *
+     * 手动缓存的剧集不计入这个上限, 也不会被自动淘汰 —— 它们只由用户在存储设置里清理.
+     * `0` 表示不限制.
+     */
+    val maxAutoCachedDanmakuEpisodes: Int = 200,
+
     @Suppress("PropertyName") @Transient val _placeholder: Int = 0,
 ) {
     companion object {

@@ -178,6 +178,17 @@ open class SettingsViewModel : AbstractSettingsViewModel(), KoinComponent {
                 danmakuRepository.clearCachedDanmaku()
             }
         },
+        cachedDanmakuEpisodesFlow = danmakuRepository.cachedDanmakuEpisodesFlow(),
+        onRemoveDanmakuCacheOfEpisode = { subjectId, episodeId ->
+            withContext(Dispatchers.IO_) {
+                danmakuRepository.removeCachedDanmaku(subjectId, episodeId)
+            }
+        },
+        onRemoveDanmakuCacheOfSubject = { subjectId ->
+            withContext(Dispatchers.IO_) {
+                danmakuRepository.removeCachedDanmakuOfSubject(subjectId)
+            }
+        },
     )
 
     internal val mediaSelectorSettingsState: SettingsState<MediaSelectorSettings> =
