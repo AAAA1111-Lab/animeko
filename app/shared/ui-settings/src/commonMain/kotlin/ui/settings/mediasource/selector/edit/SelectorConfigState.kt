@@ -64,6 +64,19 @@ class SelectorConfigState(
     )
     val searchUrlIsError by derivedStateOf { searchUrl.isBlank() }
 
+    // region 自动匹配层
+
+    var autoMatchEnabled by argumentsStorage.prop(
+        { it.searchConfig.autoMatch.enabled },
+        { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(enabled = it))) },
+        SelectorMediaSourceArguments.Default.searchConfig.autoMatch.enabled,
+    )
+
+    var tier by argumentsStorage.prop(
+        { it.tier }, { copy(tier = it) },
+        SelectorMediaSourceArguments.Default.tier,
+    )
+
     var searchUseOnlyFirstWord by argumentsStorage.prop(
         { it.searchConfig.autoMatch.searchUseOnlyFirstWord },
         { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(searchUseOnlyFirstWord = it))) },
@@ -86,6 +99,28 @@ class SelectorConfigState(
         { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(preferShorterName = it))) },
         SelectorMediaSourceArguments.Default.searchConfig.autoMatch.preferShorterName,
     )
+    var filterByEpisodeSort by argumentsStorage.prop(
+        { it.searchConfig.autoMatch.filterByEpisodeSort },
+        { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(filterByEpisodeSort = it))) },
+        SelectorMediaSourceArguments.Default.searchConfig.autoMatch.filterByEpisodeSort,
+    )
+
+    /**
+     * 播放 session 内复用搜索结果的时长. 浏览不读写缓存, 因此属于自动匹配层.
+     */
+    var searchCacheTtl by argumentsStorage.prop(
+        { it.searchConfig.searchCacheTtl },
+        { copy(searchConfig = searchConfig.copy(searchCacheTtl = it.coerceAtLeast(0.milliseconds))) },
+        SelectorMediaSourceArguments.Default.searchConfig.searchCacheTtl,
+    )
+
+    // endregion
+
+    var userAgent by argumentsStorage.prop(
+        { it.searchConfig.userAgent },
+        { copy(searchConfig = searchConfig.copy(userAgent = it)) },
+        SelectorMediaSourceArguments.Default.searchConfig.userAgent,
+    )
 
     var rawBaseUrl by argumentsStorage.prop(
         { it.searchConfig.rawBaseUrl },
@@ -104,12 +139,6 @@ class SelectorConfigState(
         { it.searchConfig.requestInterval },
         { copy(searchConfig = searchConfig.copy(requestInterval = it.coerceAtLeast(0.milliseconds))) },
         SelectorMediaSourceArguments.Default.searchConfig.requestInterval,
-    )
-
-    var searchCacheTtl by argumentsStorage.prop(
-        { it.searchConfig.searchCacheTtl },
-        { copy(searchConfig = searchConfig.copy(searchCacheTtl = it.coerceAtLeast(0.milliseconds))) },
-        SelectorMediaSourceArguments.Default.searchConfig.searchCacheTtl,
     )
 
     // region SubjectFormat
@@ -304,16 +333,6 @@ class SelectorConfigState(
         { copy(searchConfig = searchConfig.copy(defaultSubtitleLanguage = it)) },
         SelectorMediaSourceArguments.Default.searchConfig.defaultSubtitleLanguage,
     )
-    var filterByEpisodeSort by argumentsStorage.prop(
-        { it.searchConfig.autoMatch.filterByEpisodeSort }, { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(filterByEpisodeSort = it))) },
-        SelectorMediaSourceArguments.Default.searchConfig.autoMatch.filterByEpisodeSort,
-    )
-    var filterBySubjectName by argumentsStorage.prop(
-        { it.searchConfig.autoMatch.filterBySubjectName }, { copy(searchConfig = searchConfig.copy(autoMatch = searchConfig.autoMatch.copy(filterBySubjectName = it))) },
-        SelectorMediaSourceArguments.Default.searchConfig.autoMatch.filterBySubjectName,
-    )
-
-
     val selectMediaConfig: SelectMediaConfig = SelectMediaConfig()
 
     @Stable
@@ -390,9 +409,6 @@ class SelectorConfigState(
 
             var referer by prop(
                 { it.referer }, { copy(referer = it) },
-            )
-            var userAgent by prop(
-                { it.userAgent }, { copy(userAgent = it) },
             )
         }
     }

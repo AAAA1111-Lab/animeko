@@ -42,9 +42,11 @@ internal class ExoPlayerVideoEnhancementController(
     parentCoroutineContext: CoroutineContext,
 ) : BaseVideoEnhancementController(player, parentCoroutineContext) {
     private var appliedMode = VideoEnhancementMode.OFF
-    private var scalerApplied = false
-    private var appliedWidth = 0
-    private var appliedHeight = 0
+
+    /**
+     * The scaler of the applied effect list, or `null` while the mode is [VideoEnhancementMode.OFF].
+     */
+    private var appliedScaler: DesktopStyleLanczosSharpEffect? = null
 
     init {
         // Media3 requires the effect graph to exist before the first prepare in order to
@@ -67,16 +69,18 @@ internal class ExoPlayerVideoEnhancementController(
             return
         }
 
-        // The shader receives input dimensions in configure(). Metadata availability must not
-        // rebuild the effect graph: compiling the quality shaders can stall playback.
-        // DesktopStyleLanczosSharpEffect 同样在 configure() 里自适应输入尺寸 (含放大预算判定),
-        // 因此效果图只依赖视口, 视频元数据到达时不再触发整链重建.
-        val shouldApplyScaler = viewportSize != null
-        if (
-            appliedMode == mode && scalerApplied == shouldApplyScaler &&
-            (!shouldApplyScaler || appliedWidth == viewportSize.width && appliedHeight == viewportSize.height)
-        ) return
+        // Only a mode change replaces the effect list. The shaders receive input dimensions in
+        // configure() and the scaler follows the viewport by itself, so neither metadata
+        // availability nor a viewport resize rebuilds the effect graph: compiling the quality
+        // shaders can stall playback, and Media3 deadlocks the playback thread when effect lists
+        // are replaced in quick succession, as the intermediate layout sizes of a fullscreen
+        // switch would do.
+        if (appliedMode == mode) {
+            appliedScaler?.viewportSize = viewportSize
+            return
+        }
 
+        val scaler = DesktopStyleLanczosSharpEffect().apply { this.viewportSize = viewportSize }
         setVideoEffects(
             buildList {
                 when (mode) {
@@ -88,24 +92,18 @@ internal class ExoPlayerVideoEnhancementController(
                         add(Anime4kUpscaleQualityEffect)
                     }
                 }
-                if (shouldApplyScaler) {
-                    add(DesktopStyleLanczosSharpEffect(viewportSize.width, viewportSize.height))
-                }
+                add(scaler)
             },
         )
         appliedMode = mode
-        scalerApplied = shouldApplyScaler
-        appliedWidth = viewportSize?.width ?: 0
-        appliedHeight = viewportSize?.height ?: 0
+        appliedScaler = scaler
     }
 
     override fun restore() {
         if (appliedMode == VideoEnhancementMode.OFF) return
         setVideoEffects(emptyList())
         appliedMode = VideoEnhancementMode.OFF
-        scalerApplied = false
-        appliedWidth = 0
-        appliedHeight = 0
+        appliedScaler = null
     }
 }
 

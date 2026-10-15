@@ -10,6 +10,7 @@
 package me.him188.ani.app.platform
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -17,8 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -34,12 +35,11 @@ import me.him188.ani.app.data.network.AniEpisodeCommentService
 import me.him188.ani.app.data.network.AniPersonCommentService
 import me.him188.ani.app.data.network.AniSubjectRelationIndexService
 import me.him188.ani.app.data.network.AniSubjectSearchService
-import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.AnimeScheduleService
-import me.him188.ani.app.data.network.BangumiSummaryService
 import me.him188.ani.app.data.network.BangumiBangumiCommentServiceImpl
 import me.him188.ani.app.data.network.BangumiCommentService
 import me.him188.ani.app.data.network.BangumiRelatedPeopleService
+import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.DefaultWatchTogetherApiService
 import me.him188.ani.app.data.network.EpisodeService
 import me.him188.ani.app.data.network.EpisodeServiceImpl
@@ -50,25 +50,21 @@ import me.him188.ani.app.data.persistent.dataStores
 import me.him188.ani.app.data.persistent.database.AniDatabase
 import me.him188.ani.app.data.persistent.database.MIGRATION_19_20
 import me.him188.ani.app.data.persistent.database.createDatabaseBuilder
-import me.him188.ani.app.data.repository.media.MediaSourceSaves
-import me.him188.ani.app.data.repository.media.MediaSourceSubscriptionRepository
 import me.him188.ani.app.data.repository.episode.EpisodeCollectionRepository
 import me.him188.ani.app.data.repository.episode.EpisodeCollectionSyncer
+import me.him188.ani.app.data.repository.media.MediaSourceSaves
+import me.him188.ani.app.data.repository.media.MediaSourceSubscriptionRepository
 import me.him188.ani.app.data.repository.player.PlaybackHistorySyncer
 import me.him188.ani.app.data.repository.repositoryModules
 import me.him188.ani.app.data.repository.torrent.peer.PeerFilterSubscriptionRepository
 import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.SettingsRepository
+import me.him188.ani.app.data.repository.user.UserRepository
 import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
-import me.him188.ani.app.domain.torrent.TorrentEngineType
-import me.him188.ani.app.domain.torrent.engines.PikPakEngine
-import me.him188.ani.torrent.pikpak.PikPakCredentials
-import me.him188.ani.torrent.pikpak.PikPakSessionStoreAdapter
-import me.him188.ani.utils.io.inSystem
+import me.him188.ani.app.domain.foundation.AniInstallIdFeatureHandler
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeature
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeatureHandler
 import me.him188.ani.app.domain.foundation.CookieJarFeatureHandler
-import me.him188.ani.app.domain.foundation.WebSourceIdentityFeatureHandler
 import me.him188.ani.app.domain.foundation.DefaultHttpClientProvider
 import me.him188.ani.app.domain.foundation.DefaultHttpClientProvider.HoldingInstanceMatrix
 import me.him188.ani.app.domain.foundation.DefaultVersionExpiryService
@@ -87,66 +83,69 @@ import me.him188.ani.app.domain.foundation.UserAgentFeature
 import me.him188.ani.app.domain.foundation.UserAgentFeatureHandler
 import me.him188.ani.app.domain.foundation.VersionExpiryFeatureHandler
 import me.him188.ani.app.domain.foundation.VersionExpiryService
+import me.him188.ani.app.domain.foundation.WebSourceIdentityFeatureHandler
 import me.him188.ani.app.domain.foundation.get
 import me.him188.ani.app.domain.foundation.withValue
-import me.him188.ani.app.domain.media.download.DownloadOperations
-import me.him188.ani.app.domain.media.download.MediaDownloadManager
-import me.him188.ani.app.domain.mediasource.web.PageEvaluator
-import me.him188.ani.app.domain.mediasource.web.captcha.BrowserImageCaptchaSolver
-import me.him188.ani.app.domain.mediasource.web.captcha.CaptchaBrowserFactory
-import me.him188.ani.app.domain.mediasource.web.captcha.GirigiriSearchRoute
-import me.him188.ani.app.domain.mediasource.web.captcha.ImageCaptchaRecognizer
-import me.him188.ani.app.domain.mediasource.web.captcha.MacCmsImageCaptchaSolver
-import me.him188.ani.app.domain.mediasource.web.captcha.WebSessionManager
-import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceCookieJar
-import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistry
+import me.him188.ani.app.domain.install.InstallIdRepository
+import me.him188.ani.app.domain.install.InstallReporter
 import me.him188.ani.app.domain.media.cache.MediaCacheManager
 import me.him188.ani.app.domain.media.cache.MediaCacheManagerImpl
 import me.him188.ani.app.domain.media.cache.PikPakWebM3uCacheMigration
-import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
-import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine
-import me.him188.ani.app.domain.media.cache.engine.createLocalImportFileAccess
-import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
-import me.him188.ani.app.domain.media.cache.engine.KtorPersistentHttpDownloader
 import me.him188.ani.app.domain.media.cache.engine.AlwaysUseTorrentEngineAccess
+import me.him188.ani.app.domain.media.cache.engine.HttpMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.KtorPersistentHttpDownloader
+import me.him188.ani.app.domain.media.cache.engine.LocalImportMediaCacheEngine
 import me.him188.ani.app.domain.media.cache.engine.MediaCacheEngineKey
 import me.him188.ani.app.domain.media.cache.engine.TorrentMediaCacheEngine
+import me.him188.ani.app.domain.media.cache.engine.createLocalImportFileAccess
 import me.him188.ani.app.domain.media.cache.storage.HttpMediaCacheStorage
+import me.him188.ani.app.domain.media.cache.storage.LocalImportMediaCacheStorage
 import me.him188.ani.app.domain.media.cache.storage.MediaSaveDirProvider
 import me.him188.ani.app.domain.media.cache.storage.TorrentMediaCacheStorage
+import me.him188.ani.app.domain.media.download.DownloadOperations
+import me.him188.ani.app.domain.media.download.MediaDownloadManager
 import me.him188.ani.app.domain.media.fetch.MediaSourceManager
 import me.him188.ani.app.domain.media.fetch.MediaSourceManagerImpl
 import me.him188.ani.app.domain.mediasource.codec.MediaSourceCodecManager
 import me.him188.ani.app.domain.mediasource.subscription.MediaSourceSubscriptionRequesterImpl
 import me.him188.ani.app.domain.mediasource.subscription.MediaSourceSubscriptionUpdater
+import me.him188.ani.app.domain.mediasource.web.PageEvaluator
+import me.him188.ani.app.domain.mediasource.web.captcha.BrowserImageCaptchaSolver
+import me.him188.ani.app.domain.mediasource.web.captcha.CaptchaBrowserFactory
+import me.him188.ani.app.domain.mediasource.web.captcha.ImageCaptchaRecognizer
+import me.him188.ani.app.domain.mediasource.web.captcha.MacCmsImageCaptchaSolver
+import me.him188.ani.app.domain.mediasource.web.captcha.WebSessionManager
+import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceCookieJar
+import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistry
 import me.him188.ani.app.domain.session.AniSessionRefresher
 import me.him188.ani.app.domain.session.SessionManager
 import me.him188.ani.app.domain.session.SessionStateProvider
 import me.him188.ani.app.domain.settings.ProxyProvider
 import me.him188.ani.app.domain.settings.SettingsBasedProxyProvider
+import me.him188.ani.app.domain.torrent.TorrentEngineType
 import me.him188.ani.app.domain.torrent.TorrentManager
+import me.him188.ani.app.domain.torrent.engines.PikPakEngine
 import me.him188.ani.app.domain.update.UpdateManager
+import me.him188.ani.app.domain.usecase.useCaseModules
 import me.him188.ani.app.domain.watchtogether.LocalPlaybackBridge
 import me.him188.ani.app.domain.watchtogether.PlaybackAutomationGate
 import me.him188.ani.app.domain.watchtogether.WatchTogetherManager
-import me.him188.ani.app.domain.usecase.useCaseModules
 import me.him188.ani.app.ui.subject.details.state.DefaultSubjectDetailsStateFactory
 import me.him188.ani.app.ui.subject.details.state.SubjectDetailsStateFactory
-import me.him188.ani.datasources.bangumi.BangumiClient
-import me.him188.ani.datasources.bangumi.BangumiClientImpl
+import me.him188.ani.torrent.pikpak.PikPakCredentials
+import me.him188.ani.torrent.pikpak.PikPakSessionStoreAdapter
 import me.him188.ani.utils.coroutines.IO_
 import me.him188.ani.utils.coroutines.childScope
 import me.him188.ani.utils.coroutines.childScopeContext
 import me.him188.ani.utils.httpdownloader.HttpDownloader
+import me.him188.ani.utils.io.inSystem
 import me.him188.ani.utils.io.resolve
 import me.him188.ani.utils.logging.logger
 import me.him188.ani.utils.logging.warn
 import org.koin.core.KoinApplication
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
-import kotlin.time.Duration.Companion.minutes
 
-private val Scope.client get() = get<BangumiClient>()
 private val Scope.database get() = get<AniDatabase>()
 private val Scope.settingsRepository get() = get<SettingsRepository>()
 private val Scope.aniApiProvider get() = get<AniApiProvider>()
@@ -178,6 +177,9 @@ private fun KoinApplication.otherModules(
             tokenRepository = get(),
             coroutineScope = coroutineScope,
             refreshSession = AniSessionRefresher { aniApiProvider.userAuthApi },
+            newLoginListener = SessionManager.NewLoginListener { userId ->
+                get<InstallReporter>().beforeNewLogin(userId)
+            },
         )
     }
     single<SessionStateProvider> {
@@ -190,8 +192,10 @@ private fun KoinApplication.otherModules(
             coroutineScope,
         )
     }
+    single<InstallIdRepository> { InstallIdRepository(getContext().dataStores.installInfoStore) }
     single<HttpClientProvider> {
         val sessionManager by inject<SessionManager>()
+        val installIdRepository = get<InstallIdRepository>()
         DefaultHttpClientProvider(
             get(), coroutineScope,
             featureHandlers = listOf(
@@ -202,6 +206,7 @@ private fun KoinApplication.otherModules(
                     },
                     onRefresh = { null },
                 ),
+                AniInstallIdFeatureHandler { installIdRepository.currentId },
                 ServerListFeatureHandler(
                     get<ServerSelector>().flow,
                 ),
@@ -241,7 +246,6 @@ private fun KoinApplication.otherModules(
             solverEnabled = {
                 settingsRepository.mediaSelectorSettings.flow.first().enableImageCaptchaAutoSolve
             },
-            searchRoutes = listOf(GirigiriSearchRoute(evaluator)),
             maxSessions = browserFactory.recommendedMaxSessions,
         )
     }
@@ -255,11 +259,13 @@ private fun KoinApplication.otherModules(
             }
         }
     }
-    single<AniApiProvider> { AniApiProvider(get<HttpClientProvider>().get(useAniToken = true)) }
+    single<AniApiProvider> {
+        AniApiProvider(get<HttpClientProvider>().get(useAniToken = true, useAniInstallId = true))
+    }
     single<WatchTogetherApiService> {
         DefaultWatchTogetherApiService(
             provider = get(),
-            eventsClient = get<HttpClientProvider>().get(useAniToken = true, useSse = true),
+            eventsClient = get<HttpClientProvider>().get(useAniToken = true, useAniInstallId = true, useSse = true),
         )
     }
     single<LocalPlaybackBridge> { LocalPlaybackBridge() }
@@ -273,13 +279,6 @@ private fun KoinApplication.otherModules(
             playbackBridge = get(),
             automationGate = get(),
         ).also { it.start() }
-    }
-    single<BangumiClient> {
-        BangumiClientImpl(
-            get<HttpClientProvider>().get(
-                userAgent = ScopedHttpClientUserAgent.ANI,
-            ),
-        )
     }
 
     single<AniSubjectSearchService> {
@@ -328,14 +327,22 @@ private fun KoinApplication.otherModules(
             scope = coroutineScope,
         ).also { it.start() }
     }
+    single(createdAtStart = true) {
+        InstallReporter(
+            store = getContext().dataStores.installInfoStore,
+            playHistoryRepository = get(),
+            api = aniApiProvider.userProfileApi,
+            sessionStateProvider = get(),
+            currentUserId = get<UserRepository>().selfInfoFlow.map { it?.id?.toString() },
+            scope = coroutineScope,
+        ).also { it.start() }
+    }
     single<AniSubjectRelationIndexService> {
         val provider = get<AniApiProvider>()
         AniSubjectRelationIndexService(provider.subjectRelationsApi)
     }
 
     single<AnimeScheduleService> { AnimeScheduleService(get<AniApiProvider>().scheduleApi) }
-    // TV 横版 backdrop / 分集剧照; 未配置 ani.tmdb.api.token 时自动关闭
-    single<BangumiSummaryService> { BangumiSummaryService(get()) }
 
     // 应用级单例: 批量缓存弹幕必须在离开条目缓存页后继续跑, 因此它的作用域不能是页面的 ViewModel.
     single<DanmakuBatchCacheManager> {
@@ -539,6 +546,14 @@ fun KoinApplication.startCommonKoinModule(
     // Start the proxy provider very soon (before initialization of any other components)
     runBlocking {
         koin.get<SessionManager>().clearSessionIfAccessTokenExpired()
+        // 在任何请求之前加载, 让发往 Ani 服务器的请求都带上安装 ID
+        try {
+            koin.get<InstallIdRepository>().load()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger("ani-startup").warn(e) { "Failed to load install id" }
+        }
         // We have to block here to read the saved proxy settings
         when (val proxyProvider = koin.get<HttpClientProvider>()) {
             // compile-safe type cast

@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  * AniDatabase 迁移测试 (infra#10, P0#18).
  *
  * 生产迁移链 (CommonKoinModule): 1..15 destructive, 16 起走
- * AutoMigration 16→17→18→19, 手动 [MIGRATION_19_20], AutoMigration 20→21→22→23→24→25→26→27→28.
+ * AutoMigration 16→17→18→19, 手动 [MIGRATION_19_20], AutoMigration 20→21→22→23→24→25→26→27→28→29.
  *
  * [MigrationTestHelper] 从 `schemas/<db fqn>/<version>.json` 建旧版本库,
  * runMigrationsAndValidate 会把迁移后的实际 schema 与目标版本 json 逐表逐列校验.
@@ -269,6 +269,60 @@ class AniDatabaseMigrationTest {
                 assertEquals(0L, statement.getLong(1))
                 assertEquals("text", statement.getText(2))
             }
+        }
+    }
+
+    @Test
+    fun `MIG-11 v28到v29保留手动自动弹幕缓存并增加分季信息`() {
+        val helper = createHelper()
+        helper.createDatabase(28).use { connection ->
+            connection.execSQL(
+                "INSERT INTO `subject_collection` (`subjectId`, `name`, `nameCn`, `summary`, `nsfw`, `imageLarge`, " +
+                        "`totalEpisodes`, `airDate`, `aliases`, `tags`, `completeDate`, `collectionType`, " +
+                        "`collection_stats_wish`, `collection_stats_doing`, `collection_stats_done`, `collection_stats_onHold`, " +
+                        "`collection_stats_dropped`, `rating_rank`, `rating_total`, `rating_score`, `rating_count_s1`, " +
+                        "`rating_count_s2`, `rating_count_s3`, `rating_count_s4`, `rating_count_s5`, `rating_count_s6`, " +
+                        "`rating_count_s7`, `rating_count_s8`, `rating_count_s9`, `rating_count_s10`, `self_rating_score`, " +
+                        "`self_rating_tags`, `self_rating_isPrivate`) VALUES (1, 'n', 'cn', '', 0, '', 12, 0, X'5B5D', X'5B5D', 0, " +
+                        "'DOING', 0, 0, 0, 0, 0, 0, 0, '0', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, X'5B5D', 0)",
+            )
+            connection.execSQL(
+                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeSort`, `episodeEp`, `episodeName`, " +
+                        "`imageMedium`, `imageLarge`, `type`, `episodeType`, `hasPublished`, `isKnownCompleted`) " +
+                        "VALUES (1, 11, 1, 1, 'ep', NULL, NULL, 'MAIN', 'NUMBER', 1, 0), (1, 12, 2, 2, 'ep2', NULL, NULL, 'MAIN', 'NUMBER', 1, 0)",
+            )
+            connection.execSQL(
+                "INSERT INTO `danmaku` (`id`, `subjectId`, `episodeId`, `serviceId`, `presentationServiceId`, " +
+                        "`senderId`, `content_playTimeMillis`, `content_color`, `content_text`, `content_location`, " +
+                        "`origin`, `cachedAtMillis`) VALUES " +
+                        "('manual', 1, 11, 's', 's', 'sender', 1000, 0, 'manual text', 'NORMAL', 'MANUAL', 123), " +
+                        "('auto', 1, 12, 's', 's', 'sender', 2000, 0, 'auto text', 'NORMAL', 'AUTO', 456)",
+            )
+        }
+        helper.runMigrationsAndValidate(29, emptyList()).use { connection ->
+            assertContains(connection.columnNames("subject_collection"), "relations_splitSeason")
+            connection.prepare("SELECT `origin`, `cachedAtMillis`, `content_text` FROM `danmaku` ORDER BY `id`").use {
+                assertTrue(it.step())
+                assertEquals("AUTO", it.getText(0))
+                assertEquals(456L, it.getLong(1))
+                assertEquals("auto text", it.getText(2))
+                assertTrue(it.step())
+                assertEquals("MANUAL", it.getText(0))
+                assertEquals(123L, it.getLong(1))
+                assertEquals("manual text", it.getText(2))
+                assertFalse(it.step())
+            }
+        }
+    }
+
+    @Test
+    fun `MIG-12 v27到v29完整迁移通过schema校验`() {
+        val helper = createHelper()
+        helper.createDatabase(27).use {}
+        helper.runMigrationsAndValidate(29, emptyList()).use { connection ->
+            assertContains(connection.columnNames("danmaku"), "origin")
+            assertContains(connection.columnNames("danmaku"), "cachedAtMillis")
+            assertContains(connection.columnNames("subject_collection"), "relations_splitSeason")
         }
     }
 

@@ -17,6 +17,16 @@ on:
         required: false
         default: ''
         type: string
+      publish_release:
+        description: '发布到 GitHub Release；关闭时仅保留构建产物'
+        required: true
+        default: true
+        type: boolean
+      run_tests:
+        description: '运行数据库迁移、搜索、本地导入、弹幕及播放器回归测试'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -86,6 +96,40 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           cache-disabled: false
+
+      - name: Run core regression tests
+        if: ${{ inputs.run_tests }}
+        run: |
+          chmod +x gradlew
+          xvfb-run -a ./gradlew :app:shared:app-data:desktopTest \
+            --tests '*AniDatabaseMigrationTest' \
+            --tests '*SubjectSearchPagingSourceTest' \
+            --tests '*SubjectSearchFiltersTest' \
+            --tests '*BangumiSearchServiceTest' \
+            --tests '*DanmakuCacheTest' \
+            --tests '*DanmakuDaoTest' \
+            --tests '*LocalImportMediaCacheStorageTest' \
+            --tests '*EpisodeFilenameParserTest' \
+            --tests '*GetSubjectRecommendationUseCaseTest' \
+            --no-configuration-cache --stacktrace
+          ./gradlew :app:shared:video-player:testAndroidHostTest \
+            --no-configuration-cache --stacktrace
+          xvfb-run -a ./gradlew :datasource:jellyfin:desktopTest \
+            --no-configuration-cache --stacktrace
+
+      - name: Upload regression reports and Room schemas
+        if: ${{ always() && inputs.run_tests }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-regression-reports
+          path: |
+            app/shared/app-data/build/reports/tests/
+            app/shared/app-data/build/test-results/
+            app/shared/app-data/schemas/
+            app/shared/video-player/build/reports/tests/
+            app/shared/video-player/build/test-results/
+            datasource/jellyfin/build/reports/tests/
+            datasource/jellyfin/build/test-results/
 
       - name: Build Android Release APK
         run: |
@@ -169,7 +213,7 @@ jobs:
     name: 'Publish to GitHub Release'
     needs: [build-android, build-windows]
     # 仅在所有实际执行 (未跳过) 的构建任务全部成功时发布; 任一构建失败或取消都不会再走发布流程.
-    if: ${{ !cancelled() && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped') && (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') }}
+    if: ${{ inputs.publish_release && !cancelled() && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped') && (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

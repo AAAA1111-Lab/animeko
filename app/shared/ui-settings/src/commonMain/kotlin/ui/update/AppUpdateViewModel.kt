@@ -31,6 +31,7 @@ import me.him188.ani.app.platform.ContextMP
 import me.him188.ani.app.platform.currentAniBuildConfig
 import me.him188.ani.app.tools.MonoTasker
 import me.him188.ani.app.tools.update.DefaultFileDownloader
+import me.him188.ani.app.tools.update.PARALLEL_DOWNLOAD_CONNECTIONS
 import me.him188.ani.app.tools.update.FileDownloaderState
 import me.him188.ani.app.tools.update.InstallationResult
 import me.him188.ani.app.tools.update.UpdateInstallationRunner
@@ -51,7 +52,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * 主页使用的自动更新检查
  */
 @Stable
-class AppUpdateViewModel : AbstractViewModel(), KoinComponent {
+open class AppUpdateViewModel : AbstractViewModel(), KoinComponent {
     private val settingsRepository: SettingsRepository by inject()
     private val updateSettings = settingsRepository.updateSettings.flow
     private val updateManager: UpdateManager by inject()
@@ -59,7 +60,9 @@ class AppUpdateViewModel : AbstractViewModel(), KoinComponent {
     private val updateInstaller: UpdateInstaller by inject()
     private val installationRunner by lazy { UpdateInstallationRunner(updateInstaller) }
 
-    private val fileDownloader by lazy { DefaultFileDownloader(clientProvider.get()) }
+    private val fileDownloader by lazy {
+        DefaultFileDownloader(clientProvider.get(maxRequestsPerHost = PARALLEL_DOWNLOAD_CONNECTIONS))
+    }
     private val updateChecker: UpdateChecker = UpdateChecker()
 
     /**

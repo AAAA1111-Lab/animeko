@@ -18,11 +18,14 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -31,11 +34,11 @@ import me.him188.ani.app.data.models.subject.RatingCounts
 import me.him188.ani.app.data.models.subject.RatingInfo
 import me.him188.ani.app.data.models.subject.SubjectCollectionStats
 import me.him188.ani.app.data.models.subject.SubjectInfo
+import me.him188.ani.app.domain.search.SearchSort
 import me.him188.ani.app.domain.search.SubjectType
 import me.him188.ani.datasources.api.PackedDate
 import me.him188.ani.utils.coroutines.IO_
 import me.him188.ani.utils.ktor.ScopedHttpClient
-import kotlin.coroutines.CoroutineContext
 
 /**
  * bgm.tv (Bangumi 官方 API) 的条目搜索.
@@ -51,73 +54,44 @@ class BangumiSearchService(
 ) {
     private val fallbackClient by lazy { HttpClient() }
 
-    suspend fun searchSubjects(keywords: String, limit: Int = 20): List<BangumiSubjectSearchResult> =
-        withContext(ioDispatcher) {
-            val responseText = if (client != null) {
-                client.use {
-                    post("https://api.bgm.tv/v0/search/subjects") {
-                        header(HttpHeaders.UserAgent, BGM_SEARCH_USER_AGENT)
-                        contentType(ContentType.Application.Json)
-                        parameter("limit", limit)
-                        setBody(
-                            buildJsonObject {
-                                put("keyword", keywords)
-                                put(
-                                    "filter",
-                                    buildJsonObject {
-                                        put(
-                                            "type",
-                                            buildJsonArray {
-                                                add(JsonPrimitive(2))
-                                            },
-                                        )
-                                    },
-                                )
-                            }.toString(),
-                        )
-                    }.bodyAsText()
-                }
-            } else {
-                fallbackClient.post("https://api.bgm.tv/v0/search/subjects") {
-                    header(HttpHeaders.UserAgent, BGM_SEARCH_USER_AGENT)
-                    contentType(ContentType.Application.Json)
-                    parameter("limit", limit)
-                    setBody(
-                        buildJsonObject {
-                            put("keyword", keywords)
-                            put(
-                                "filter",
-                                buildJsonObject {
-                                    put(
-                                        "type",
-                                        buildJsonArray {
-                                            add(JsonPrimitive(2))
-                                        },
-                                    )
-                                },
-                            )
-                        }.toString(),
-                    )
-                }.bodyAsText()
-            }
+    suspend fun searchSubjects(
+        keywords: String,
+        limit: Int = 20,
+        filters: SubjectSearchFilters? = null,
+        sort: SearchSort = SearchSort.MATCH,
+    ): List<BangumiSubjectSearchResult> = withContext(ioDispatcher) {
+        val body = buildBangumiSearchBody(keywords, filters, sort)
+        suspend fun HttpClient.search(): String = post("https://api.bgm.tv/v0/search/subjects") {
+            header(HttpHeaders.UserAgent, BGM_SEARCH_USER_AGENT)
+            contentType(ContentType.Application.Json)
+            parameter("limit", limit)
+            setBody(body.toString())
+        }.bodyAsText()
 
-            val response = json.decodeFromString<BangumiSearchResponse>(responseText)
-            response.data
-                .filter { it.type == null || it.type == 2 }
-                .map {
-                    BangumiSubjectSearchResult(
-                        subjectId = it.id,
-                        name = it.name,
-                        nameCn = it.nameCn,
-                        imageUrl = it.image ?: it.images?.large ?: it.images?.common,
-                        summary = it.summary,
-                        date = it.date,
-                        eps = it.eps ?: it.totalEpisodes,
-                        score = it.rating?.score,
-                        rank = it.rating?.rank,
-                    )
-                }
-        }
+        val responseText = if (client != null) client.use { search() } else fallbackClient.search()
+        val response = json.decodeFromString<BangumiSearchResponse>(responseText)
+        val results = response.data
+            .filter { it.type == null || it.type == 2 }
+            .filter { item ->
+                val expectedNsfw = filters?.nsfw
+                expectedNsfw == null || item.nsfw == expectedNsfw
+            }
+            .map {
+                BangumiSubjectSearchResult(
+                    subjectId = it.id,
+                    name = it.name,
+                    nameCn = it.nameCn,
+                    imageUrl = it.image ?: it.images?.large ?: it.images?.common,
+                    summary = it.summary,
+                    date = it.date,
+                    eps = it.eps ?: it.totalEpisodes,
+                    score = it.rating?.score,
+                    rank = it.rating?.rank,
+                    nsfw = it.nsfw,
+                )
+            }
+        if (sort == SearchSort.DATE) results.sortedByDescending { it.date.orEmpty() } else results
+    }
 
     private companion object {
         const val BGM_SEARCH_USER_AGENT = "Animeko/1.0 (https://github.com/open-ani/ani)"
@@ -143,6 +117,7 @@ data class BangumiSubjectSearchResult(
     val eps: Int? = null,
     val score: Double? = null,
     val rank: Int? = null,
+    val nsfw: Boolean = false,
 )
 
 fun BangumiSubjectSearchResult.toBatchSubjectDetails(): BatchSubjectDetails {
@@ -157,7 +132,7 @@ fun BangumiSubjectSearchResult.toBatchSubjectDetails(): BatchSubjectDetails {
             name = name,
             nameCn = nameCn.ifBlank { name },
             summary = summary.orEmpty(),
-            nsfw = false,
+            nsfw = nsfw,
             imageLarge = imageUrl.orEmpty(),
             totalEpisodes = eps ?: 0,
             airDate = airDate,
@@ -191,6 +166,7 @@ private data class BangumiSearchSubjectItem(
     val name: String,
     @SerialName("name_cn") val nameCn: String = "",
     val type: Int? = null,
+    val nsfw: Boolean = false,
     val image: String? = null,
     val images: BangumiSearchImages? = null,
     val summary: String? = null,
@@ -216,3 +192,29 @@ private data class BangumiSearchRating(
     val total: Int? = null,
 )
 
+
+/** Bangumi 的筛选参数与 Ani 搜索保持一致, 收藏排除由调用方使用本地收藏处理. */
+internal fun buildBangumiSearchBody(
+    keywords: String,
+    filters: SubjectSearchFilters?,
+    sort: SearchSort,
+): JsonObject = buildJsonObject {
+    put("keyword", keywords)
+    put("sort", when (sort) {
+        SearchSort.MATCH, SearchSort.DATE -> "match"
+        SearchSort.RANK -> "score"
+        SearchSort.COLLECTION -> "heat"
+    })
+    put("filter", buildJsonObject {
+        put("type", buildJsonArray { add(JsonPrimitive(2)) })
+        for ((name, values) in listOf(
+            "tag" to filters?.tags,
+            "air_date" to filters?.airDates,
+            "rating" to filters?.ratings,
+            "rank" to filters?.ranks,
+        )) {
+            if (values != null) put(name, JsonArray(values.map(::JsonPrimitive)))
+        }
+        filters?.nsfw?.let { put("nsfw", it) }
+    })
+}

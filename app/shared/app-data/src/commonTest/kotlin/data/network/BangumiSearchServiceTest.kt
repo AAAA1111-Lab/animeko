@@ -16,12 +16,51 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import me.him188.ani.app.domain.search.SearchSort
 import me.him188.ani.utils.ktor.asScopedHttpClient
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class BangumiSearchServiceTest {
+    @Test
+    fun supplementarySearchUsesTheSameFiltersAsAniSearch() {
+        val body = buildBangumiSearchBody(
+            "frieren",
+            SubjectSearchFilters(
+                tags = listOf("奇幻"),
+                airDates = listOf(">=2023-01-01", "<2024-01-01"),
+                ratings = listOf(">=8"),
+                ranks = listOf(">=1"),
+                nsfw = false,
+            ),
+            SearchSort.RANK,
+        )
+        assertEquals(JsonPrimitive("score"), body["sort"])
+        val filter = body.getValue("filter").jsonObject
+        assertEquals(JsonPrimitive(false), filter["nsfw"])
+        assertEquals(Json.parseToJsonElement("[\">=1\"]"), filter["rank"])
+        assertEquals(Json.parseToJsonElement("[\">=2023-01-01\",\"<2024-01-01\"]"), filter["air_date"])
+        assertEquals(JsonPrimitive("奇幻"), filter.getValue("tag").jsonArray.single())
+    }
+
+    @Test
+    fun supplementarySearchRespectsNsfwAndPreservesTheFlag() = runTest {
+        val service = BangumiSearchService(HttpClient(MockEngine {
+            respond(
+                """{"data":[{"id":1,"name":"safe","type":2,"nsfw":false},{"id":2,"name":"restricted","type":2,"nsfw":true}]}""",
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }).asScopedHttpClient())
+        assertEquals(listOf(1), service.searchSubjects("test", filters = SubjectSearchFilters(nsfw = false)).map { it.subjectId })
+        val restricted = service.searchSubjects("test", filters = SubjectSearchFilters(nsfw = true)).single()
+        assertEquals(true, restricted.toBatchSubjectDetails().subjectInfo.nsfw)
+    }
+
     @Test
     fun `searchSubjects correctly parses real Bangumi API response with nested rating and images`() = runTest {
         val mockJson = """

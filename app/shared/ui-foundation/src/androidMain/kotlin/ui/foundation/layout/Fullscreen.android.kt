@@ -25,12 +25,19 @@ import me.him188.ani.utils.logging.logger
 private val logger = logger("Fullscreen")
 
 @Suppress("USELESS_CAST") // compiler bug
-actual suspend fun Context.setRequestFullScreen(window: PlatformWindowMP, fullscreen: Boolean) {
-    logger.info { "Requesting fullscreen: $fullscreen, context=$this" }
+actual suspend fun Context.setRequestFullScreen(
+    window: PlatformWindowMP,
+    fullscreen: Boolean,
+    lockLandscape: Boolean,
+) {
+    logger.info { "Requesting fullscreen: $fullscreen, lockLandscape=$lockLandscape, context=$this" }
     if (this is Activity) {
         if (fullscreen) {
-            // go landscape
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            requestedOrientation = if (lockLandscape) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
 
             // keep screen on
             this.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

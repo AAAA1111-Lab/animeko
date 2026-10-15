@@ -14,6 +14,8 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -25,29 +27,27 @@ import me.him188.ani.app.data.network.AniSubjectSearchService
 import me.him188.ani.app.data.network.BangumiSearchService
 import me.him188.ani.app.data.network.BangumiSubjectSearchResult
 import me.him188.ani.app.data.network.BatchSubjectDetails
-import me.him188.ani.app.data.network.toBatchSubjectDetails
 import me.him188.ani.app.data.network.SubjectSearchField
 import me.him188.ani.app.data.network.SubjectSearchFilters
+import me.him188.ani.app.data.network.toBatchSubjectDetails
 import me.him188.ani.app.data.repository.Repository
 import me.him188.ani.app.data.repository.RepositoryException
 import me.him188.ani.app.domain.search.RatingRange
 import me.him188.ani.app.domain.search.SearchSort
 import me.him188.ani.app.domain.search.SubjectSearchQuery
 import me.him188.ani.datasources.api.topic.UnifiedCollectionType
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.cancellation.CancellationException
 
 class SubjectSearchRepository(
     private val aniSubjectSearchService: AniSubjectSearchService,
-    private val subjectCollectionRepository: SubjectCollectionRepository,
-    private val bangumiSearchService: BangumiSearchService,
+    private val subjectCollectionRepository: SubjectCollectionRepository? = null,
+    private val bangumiSearchService: BangumiSearchService = BangumiSearchService(),
     defaultDispatcher: CoroutineContext = Dispatchers.Default,
 ) : Repository(defaultDispatcher) {
 
     /**
      * 使用 [searchQuery] 搜索条目.
      *
-     * 注意, 此方法返回的数据总是会包含 NSFW 条目. 调用方需要自行根据用户设置考虑过滤.
+     * 查询筛选由 Ani 与 Bangumi 搜索接口执行; Bangumi 补充结果的收藏排除使用本地收藏.
      */
     fun searchSubjects(
         searchQuery: SubjectSearchQuery,
@@ -70,11 +70,12 @@ class SubjectSearchRepository(
     suspend fun searchSubjectsOnBangumi(keywords: String, limit: Int = 20): List<BangumiSubjectSearchResult> =
         bangumiSearchService.searchSubjects(keywords, limit)
 
-    private inner class SubjectSearchPagingSource(
+    internal inner class SubjectSearchPagingSource(
         private val ignoreDoneAndDropped: suspend () -> Boolean,
         private val searchQuery: SubjectSearchQuery
     ) : PagingSource<Int, BatchSubjectDetails>() {
         private val filters = searchQuery.toSubjectSearchFilters()
+        private val supplementaryIds = mutableSetOf<Int>()
         override fun getRefreshKey(state: PagingState<Int, BatchSubjectDetails>): Int? = null
         override suspend fun load(
             params: LoadParams<Int>
@@ -82,11 +83,16 @@ class SubjectSearchRepository(
             val offset = params.key
                 ?: return@withContext LoadResult.Error(IllegalArgumentException("Key is null"))
             return@withContext try {
+                if (offset == 0) supplementaryIds.clear()
                 val subjects = aniSubjectSearchService.searchSubjects(
                     searchQuery.keywords,
                     offset = offset,
                     limit = params.loadSize,
-                    filters = filters,
+                    filters = if (ignoreDoneAndDropped()) {
+                        filters.copy(excludeCollectionTypes = listOf(UnifiedCollectionType.DONE, UnifiedCollectionType.DROPPED))
+                    } else {
+                        filters
+                    },
                     sort = searchQuery.sort,
                     fields = subjectSearchFields,
                 )
@@ -96,41 +102,37 @@ class SubjectSearchRepository(
                         val bgmResults = bangumiSearchService.searchSubjects(
                             searchQuery.keywords,
                             limit = params.loadSize,
+                            filters = filters,
+                            sort = searchQuery.sort,
                         )
                         val existingIds = subjects.map { it.subjectInfo.subjectId }.toSet()
                         bgmResults
                             .filter { it.subjectId !in existingIds }
                             .map { it.toBatchSubjectDetails() }
-                    }.getOrDefault(emptyList())
+                    }.getOrElse {
+                        if (it is CancellationException) throw it
+                        emptyList()
+                    }
                 } else {
                     emptyList()
                 }
 
-                val allSubjects = if (subjects.isEmpty()) {
-                    supplementarySubjects
-                } else {
-                    subjects + supplementarySubjects
-                }
-
-                val filteredSubjects = if (ignoreDoneAndDropped()) {
-                    val excludedIds = subjectCollectionRepository.getSubjectIdsByCollectionType(
+                val filteredSupplementary = if (supplementarySubjects.isNotEmpty() && ignoreDoneAndDropped()) {
+                    val excludedIds = subjectCollectionRepository?.getSubjectIdsByCollectionType(
                         types = listOf(UnifiedCollectionType.DONE, UnifiedCollectionType.DROPPED),
-                    ).first()
-
-                    allSubjects.filter { it.subjectInfo.subjectId !in excludedIds }
+                    )?.first().orEmpty()
+                    supplementarySubjects.filter { it.subjectInfo.subjectId !in excludedIds }
                 } else {
-                    allSubjects
+                    supplementarySubjects
                 }
-
-                // 在分页源中直接过滤掉不符合条件的数据 #2380
-                val subjectInfos = filterSubjectsBySort(
-                    filteredSubjects,
-                    searchQuery.sort,
-                )
-
+                val pageSubjects = subjects.filter { it.subjectInfo.subjectId !in supplementaryIds } + filteredSupplementary
+                if (offset == 0) {
+                    supplementaryIds.addAll(filteredSupplementary.map { it.subjectInfo.subjectId })
+                }
                 return@withContext LoadResult.Page(
-                    subjectInfos,
+                    pageSubjects,
                     prevKey = if (offset == 0) null else offset,
+                    // 搜索响应只有 items, 没有总数, 以空页判断结束
                     nextKey = if (subjects.isEmpty()) null else offset + params.loadSize,
                 )
             } catch (e: CancellationException) {
@@ -145,6 +147,9 @@ class SubjectSearchRepository(
                 tags,
                 airDates = toBangumiAirDates(),
                 ratings = rating?.toBangumiRatings(),
+                // "最高排名" 按评分排序, 只看 Bangumi 有排名的条目: 排名要求足够的评分人数,
+                // 否则排在最前面的全是一两个人打 10 分的冷门条目 #2380 #3505
+                ranks = if (sort == SearchSort.RANK) listOf(">=1") else null,
                 nsfw = nsfw,
             )
         }
@@ -155,21 +160,6 @@ class SubjectSearchRepository(
                 range.min?.let { ">=${it}" },
                 range.max?.let { "<${it}" },
             )
-        }
-
-        /**
-         * 将数据过滤从View提升到分页层，不然会导致 #2380
-         */
-        private fun filterSubjectsBySort(
-            subjects: List<BatchSubjectDetails>,
-            sort: SearchSort
-        ): List<BatchSubjectDetails> {
-            return when (sort) {
-                SearchSort.RANK -> subjects.filter { it.subjectInfo.ratingInfo.total >= 50 }
-                SearchSort.DATE -> subjects.sortedByDescending { it.subjectInfo.airDate }
-                SearchSort.MATCH,
-                SearchSort.COLLECTION -> subjects
-            }
         }
     }
 

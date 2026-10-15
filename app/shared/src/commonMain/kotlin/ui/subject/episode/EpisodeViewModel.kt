@@ -112,7 +112,9 @@ import me.him188.ani.app.domain.player.CacheProgressProvider
 import me.him188.ani.app.domain.player.extension.AnalyticsExtension
 import me.him188.ani.app.domain.player.extension.AutoSelectExtension
 import me.him188.ani.app.domain.player.extension.CacheOnBtPlayExtension
+import me.him188.ani.app.domain.player.extension.EpisodeExitAnalyticsExtension
 import me.him188.ani.app.domain.player.extension.MarkAsWatchedExtension
+import me.him188.ani.app.domain.player.extension.MediaFetchAnalyticsExtension
 import me.him188.ani.app.domain.player.extension.ObserveWebMediaSourcePreferenceExtension
 import me.him188.ani.app.domain.player.extension.PlaybackSpeedExtension
 import me.him188.ani.app.domain.player.extension.RememberPlayProgressExtension
@@ -163,7 +165,6 @@ import me.him188.ani.app.ui.mediaselect.manual.ManualBrowseTarget
 import me.him188.ani.app.ui.mediaselect.toWatchingEpisode
 import me.him188.ani.app.ui.mediaselect.summary.MediaSelectorSummary
 import me.him188.ani.app.ui.mediaselect.summary.MediaSelectorSummaryStateProducer
-import me.him188.ani.app.ui.mediaselect.summary.selectedMaybeExcludedMediaFlow
 import me.him188.ani.app.ui.settings.danmaku.DanmakuRegexFilterState
 import me.him188.ani.app.ui.subject.AiringLabelState
 import me.him188.ani.app.ui.subject.collection.components.EditableSubjectCollectionTypeState
@@ -369,6 +370,8 @@ open class EpisodeViewModel(
         subjectId, initialEpisodeId, player, backgroundScope,
         extensions = listOf(
             AnalyticsExtension,
+            EpisodeExitAnalyticsExtension,
+            MediaFetchAnalyticsExtension,
             PlaybackSpeedExtension.Factory(playbackSpeedFlow),
             RememberPlayProgressExtension,
             WatchTogetherPlayerExtension,
@@ -433,6 +436,9 @@ open class EpisodeViewModel(
                     subjectName = it.subjectInfo.nameCnOrName,
                     episodeSort = it.episodeInfo.sort,
                     episodeSortText = it.episodeInfo.sort.toString(),
+                    subjectNames = it.subjectInfo.allNames,
+                    episodeEp = it.episodeInfo.ep,
+                    splitSeason = it.seriesInfo.splitSeason,
                 )
             }
         }.distinctUntilChanged(),
@@ -446,7 +452,7 @@ open class EpisodeViewModel(
             // 关掉「记住选择」也结束本条目已有的记忆, 否则下一集仍会按旧记忆回放.
             if (!remember) forgetBrowseMemory()
         },
-        onPlay = ::playBrowsedMedia,
+        onPlay = { pick, memory -> playBrowsedMedia(pick.media, memory) },
         backgroundScope = backgroundScope,
     )
 
@@ -695,7 +701,8 @@ open class EpisodeViewModel(
         )
 
     var isFullscreen: Boolean by mutableStateOf(initialIsFullscreen)
-    var sidebarVisible: Boolean by mutableStateOf(true)
+    private val sidebarState = EpisodeSidebarState { isFullscreen }
+    var sidebarVisible: Boolean by sidebarState::isVisible
     val commentLazyGirdState: LazyGridState = LazyGridState()
 
     /**
@@ -1021,7 +1028,7 @@ open class EpisodeViewModel(
 
         val mediaSelectorSummaryStateProducer = MediaSelectorSummaryStateProducer(
             episodeSession.fetchSelectFlow.mapNotNull { it?.mediaSelector }
-                .flatMapLatest { it.selectedMaybeExcludedMediaFlow }
+                .flatMapLatest { it.selectedMaybeExcludedMedia }
                 .onStart { emit(null) },
             filteredSourceResults,
             getMediaSelectorSettings(),

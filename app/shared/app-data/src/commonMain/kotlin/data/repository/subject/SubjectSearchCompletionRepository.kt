@@ -13,6 +13,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -60,6 +61,11 @@ class SubjectSearchCompletionRepository(
                                 NsfwMode.BLUR -> false
                                 NsfwMode.HIDE -> false
                             },
+                            excludeCollectionTypes = if (ignoreDoneAndDroppedFlow.first()) {
+                                listOf(UnifiedCollectionType.DONE, UnifiedCollectionType.DROPPED)
+                            } else {
+                                null
+                            },
                         ),
                         fields = listOf(SubjectSearchField.NAME),
                     )
@@ -76,9 +82,26 @@ class SubjectSearchCompletionRepository(
 
                     val bgmCompletions = if (filteredSubjects.isEmpty() && query.isNotBlank()) {
                         runCatching {
-                            bangumiSearchService.searchSubjects(query, limit = params.loadSize)
+                            val excludedIds = if (ignoreDoneAndDroppedFlow.first()) {
+                                subjectCollectionRepository.getSubjectIdsByCollectionType(
+                                    listOf(UnifiedCollectionType.DONE, UnifiedCollectionType.DROPPED),
+                                ).first()
+                            } else {
+                                emptySet()
+                            }
+                            bangumiSearchService.searchSubjects(
+                                query,
+                                limit = params.loadSize,
+                                filters = SubjectSearchFilters(
+                                    nsfw = if (nsfwSettings.first() == NsfwMode.DISPLAY) null else false,
+                                ),
+                            )
+                                .filter { it.subjectId !in excludedIds }
                                 .map { it.nameCn.ifBlank { it.name } }
-                        }.getOrDefault(emptyList())
+                        }.getOrElse {
+                            if (it is CancellationException) throw it
+                            emptyList()
+                        }
                     } else {
                         emptyList()
                     }
