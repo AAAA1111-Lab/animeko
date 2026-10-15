@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retry
@@ -192,6 +193,10 @@ abstract class SubjectCollectionRepository(
      * 未收藏 (本地无记录) 时 emit `null`.
      */
     abstract fun getSubjectDisplayInfoOffline(subjectId: Int): Flow<OfflineSubjectDisplayInfo?>
+
+    /** 本地已缓存的收藏条目 ID, 用于过滤不经过 Ani 搜索接口的补充结果. */
+    open suspend fun getSubjectIdsByCollectionType(types: List<UnifiedCollectionType>): Flow<List<Int>> =
+        flowOf(emptyList())
 
     abstract suspend fun getSubjectNamesCnByCollectionType(types: List<UnifiedCollectionType>): Flow<List<String>>
 
@@ -583,6 +588,9 @@ class SubjectCollectionRepositoryImpl(
     override fun getSubjectCollectionTypeOffline(subjectId: Int): Flow<UnifiedCollectionType?> {
         return subjectCollectionDao.findById(subjectId).map { it?.collectionType }
     }
+
+    override suspend fun getSubjectIdsByCollectionType(types: List<UnifiedCollectionType>): Flow<List<Int>> =
+        subjectCollectionDao.subjectIdsByCollectionType(types).flowOn(defaultDispatcher)
 
     override fun getSubjectDisplayInfoOffline(subjectId: Int): Flow<OfflineSubjectDisplayInfo?> {
         return subjectCollectionDao.findById(subjectId).map { entity ->
