@@ -105,6 +105,7 @@ jobs:
             --tests '*AniDatabaseMigrationTest' \
             --tests '*SubjectSearchPagingSourceTest' \
             --tests '*SubjectSearchFiltersTest' \
+            --tests '*VideoScaffoldConfigTest' \
             --tests '*BangumiSearchServiceTest' \
             --tests '*DanmakuCacheTest' \
             --tests '*DanmakuDaoTest' \

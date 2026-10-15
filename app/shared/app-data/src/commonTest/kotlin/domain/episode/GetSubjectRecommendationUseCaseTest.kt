@@ -18,9 +18,9 @@ import me.him188.ani.app.data.models.subject.SubjectInfo
 import me.him188.ani.app.data.network.BatchSubjectRelations
 import me.him188.ani.app.data.network.SubjectService
 import me.him188.ani.client.models.AniSubjectCollection
+import me.him188.ani.client.models.AniCollectionType
 import me.him188.ani.client.models.AniSubjectRecommendation
 import me.him188.ani.client.models.AniUpdateSubjectCollectionRequest
-import me.him188.ani.datasources.bangumi.models.BangumiSubjectCollectionType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -36,7 +36,7 @@ class GetSubjectRecommendationUseCaseTest {
         }
 
         override suspend fun getSubjectCollections(
-            type: BangumiSubjectCollectionType?,
+            type: AniCollectionType?,
             offset: Int,
             limit: Int,
         ): List<AniSubjectCollection> = error("not used")

@@ -13,9 +13,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import me.him188.ani.app.data.persistent.database.AniDatabase
 import me.him188.ani.app.data.persistent.database.createTestAniDatabase
+import me.him188.ani.app.data.models.subject.RatingInfo
+import me.him188.ani.app.data.models.subject.SelfRatingInfo
+import me.him188.ani.app.data.models.subject.SubjectCollectionStats
 import me.him188.ani.danmaku.api.DanmakuContent
 import me.him188.ani.danmaku.api.DanmakuLocation
 import me.him188.ani.danmaku.api.DanmakuServiceId
+import me.him188.ani.datasources.api.EpisodeSort
+import me.him188.ani.datasources.api.EpisodeType
+import me.him188.ani.datasources.api.PackedDate
+import me.him188.ani.datasources.api.topic.UnifiedCollectionType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -93,6 +100,48 @@ class DanmakuDaoTest {
     private suspend fun withDatabase(block: suspend (AniDatabase) -> Unit) {
         val db = createTestAniDatabase()
         try {
+            for (subjectId in 1..3) {
+                db.subjectCollection().upsert(
+                    SubjectCollectionEntity(
+                        subjectId = subjectId,
+                        name = "subject-$subjectId",
+                        nameCn = "subject-$subjectId",
+                        summary = "",
+                        nsfw = false,
+                        imageLarge = "",
+                        totalEpisodes = 1,
+                        airDate = PackedDate.Invalid,
+                        aliases = emptyList(),
+                        tags = emptyList(),
+                        collectionStats = SubjectCollectionStats.Zero,
+                        ratingInfo = RatingInfo.Empty,
+                        completeDate = PackedDate.Invalid,
+                        selfRatingInfo = SelfRatingInfo.Empty,
+                        collectionType = UnifiedCollectionType.DOING,
+                        recurrence = null,
+                        lastUpdated = 0,
+                        lastFetched = 0,
+                        cachedStaffUpdated = 0,
+                        cachedCharactersUpdated = 0,
+                    ),
+                )
+                db.episodeCollection().upsert(
+                    EpisodeCollectionEntity(
+                        subjectId = subjectId,
+                        episodeId = subjectId * 10 + 1,
+                        episodeType = EpisodeType.MainStory,
+                        name = "episode",
+                        nameCn = "episode",
+                        airDate = PackedDate.Invalid,
+                        comment = 0,
+                        desc = "",
+                        sort = EpisodeSort(1),
+                        sortNumber = 1f,
+                        selfCollectionType = UnifiedCollectionType.DOING,
+                        lastFetched = 0,
+                    ),
+                )
+            }
             block(db)
         } finally {
             db.close()
@@ -108,6 +157,8 @@ class DanmakuDaoTest {
             id = id,
             subjectId = subjectId,
             episodeId = episodeId,
+            origin = DanmakuCacheOrigin.MANUAL,
+            cachedAtMillis = 0L,
             serviceId = DanmakuServiceId.Dandanplay,
             presentationServiceId = DanmakuServiceId.Dandanplay,
             senderId = "sender-$id",

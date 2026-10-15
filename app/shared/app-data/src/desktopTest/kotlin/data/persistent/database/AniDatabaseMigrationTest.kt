@@ -247,9 +247,9 @@ class AniDatabaseMigrationTest {
                         "'DOING', 0, 0, 0, 0, 0, 0, 0, '0', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, X'5B5D', 0)",
             )
             connection.execSQL(
-                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeSort`, `episodeEp`, `episodeName`, " +
-                        "`imageMedium`, `imageLarge`, `type`, `episodeType`, `hasPublished`, `isKnownCompleted`) " +
-                        "VALUES (1, 11, 1, 1, 'ep', NULL, NULL, 'MAIN', 'NUMBER', 1, 0)",
+                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeType`, `name`, `nameCn`, " +
+                        "`airDate`, `comment`, `desc`, `sort`, `sortNumber`, `ep`, `selfCollectionType`, `lastFetched`) " +
+                        "VALUES (1, 11, 'MainStory', 'ep', 'ep', 0, 0, '', '1', 1.0, '1', 'DOING', 0)",
             )
             connection.execSQL(
                 "INSERT INTO `danmaku` (`id`, `subjectId`, `episodeId`, `serviceId`, `presentationServiceId`, " +
@@ -287,9 +287,9 @@ class AniDatabaseMigrationTest {
                         "'DOING', 0, 0, 0, 0, 0, 0, 0, '0', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, X'5B5D', 0)",
             )
             connection.execSQL(
-                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeSort`, `episodeEp`, `episodeName`, " +
-                        "`imageMedium`, `imageLarge`, `type`, `episodeType`, `hasPublished`, `isKnownCompleted`) " +
-                        "VALUES (1, 11, 1, 1, 'ep', NULL, NULL, 'MAIN', 'NUMBER', 1, 0), (1, 12, 2, 2, 'ep2', NULL, NULL, 'MAIN', 'NUMBER', 1, 0)",
+                "INSERT INTO `episode_collection` (`subjectId`, `episodeId`, `episodeType`, `name`, `nameCn`, " +
+                        "`airDate`, `comment`, `desc`, `sort`, `sortNumber`, `ep`, `selfCollectionType`, `lastFetched`) " +
+                        "VALUES (1, 11, 'MainStory', 'ep', 'ep', 0, 0, '', '1', 1.0, '1', 'DOING', 0), (1, 12, 'MainStory', 'ep2', 'ep2', 0, 0, '', '2', 2.0, '2', 'DOING', 0)",
             )
             connection.execSQL(
                 "INSERT INTO `danmaku` (`id`, `subjectId`, `episodeId`, `serviceId`, `presentationServiceId`, " +
