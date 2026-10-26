@@ -65,12 +65,7 @@ import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.SettingsRepository
 import me.him188.ani.app.data.repository.user.UserRepository
 import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
-import me.him188.ani.app.domain.torrent.TorrentEngineType
-import me.him188.ani.app.domain.torrent.engines.PikPakEngine
 import me.him188.ani.app.domain.featureflag.FeatureFlagManager
-import me.him188.ani.torrent.pikpak.PikPakCredentials
-import me.him188.ani.torrent.pikpak.PikPakSessionStoreAdapter
-import me.him188.ani.utils.io.inSystem
 import me.him188.ani.app.domain.foundation.AniInstallIdFeatureHandler
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeature
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeatureHandler
