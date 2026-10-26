@@ -16,8 +16,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import me.him188.ani.app.domain.episode.EpisodeFetchSelectPlayState
 import me.him188.ani.app.domain.episode.EpisodeSession
+import me.him188.ani.app.domain.episode.EpisodeSwitchTrigger
 import me.him188.ani.app.domain.episode.UnsafeEpisodeSessionApi
 import me.him188.ani.app.domain.player.VideoLoadingState
+import me.him188.ani.app.domain.player.analytics.PlayFlowRecorder
 import org.koin.core.Koin
 import org.openani.mediamp.MediampPlayer
 
@@ -45,6 +47,15 @@ abstract class PlayerExtension(
     open suspend fun onBeforeSwitchEpisode(newEpisodeId: Int) {}
 
     /**
+     * Before the media selected in [episodeSession] is loaded into the player, replacing the media it is playing.
+     *
+     * The player still holds the previous media of the same episode (or no media, for the first load of the episode),
+     * so this is the last chance to read its state, e.g. to save the playback progress before switching sources.
+     * The start position of the new media is read from the play history after all extensions return.
+     */
+    open suspend fun onBeforeLoadMedia(episodeSession: EpisodeSession) {}
+
+    /**
      * Called typically when view model is being cleared (user exiting the page).
      */
     open suspend fun onClose() {}
@@ -67,6 +78,11 @@ interface ExtensionBackgroundTaskScope {
 interface PlayerExtensionContext {
     val subjectId: Int
 
+    /**
+     * 本播放页的加载流程埋点记录器. 事件应带 `EpisodeSession.playFlowEpisode`, 不读 [PlayFlowRecorder.currentEpisode].
+     */
+    val playFlow: PlayFlowRecorder
+
     val player: MediampPlayer
     val videoLoadingStateFlow: Flow<VideoLoadingState>
 
@@ -79,7 +95,11 @@ interface PlayerExtensionContext {
 
     @UnsafeEpisodeSessionApi
     suspend fun getCurrentEpisodeId(): Int
-    suspend fun switchEpisode(newEpisodeId: Int)
+
+    /**
+     * @param trigger 切集的发起方, 记入埋点.
+     */
+    suspend fun switchEpisode(newEpisodeId: Int, trigger: EpisodeSwitchTrigger = EpisodeSwitchTrigger.MANUAL)
 
     suspend fun broadcast(event: PlayerExtensionEvent)
 }

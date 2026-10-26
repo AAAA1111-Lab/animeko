@@ -29,9 +29,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import me.him188.ani.app.data.models.preference.PikPakConfig
+import me.him188.ani.app.data.network.AniAnnouncementService
 import me.him188.ani.app.data.network.AniApiProvider
 import me.him188.ani.app.data.network.AniCommentReportService
 import me.him188.ani.app.data.network.AniEpisodeCommentService
+import me.him188.ani.app.data.network.AniFeatureFlagService
+import me.him188.ani.app.data.network.AniNotificationService
 import me.him188.ani.app.data.network.AniPersonCommentService
 import me.him188.ani.app.data.network.AniSubjectRelationIndexService
 import me.him188.ani.app.data.network.AniSubjectSearchService
@@ -51,6 +54,7 @@ import me.him188.ani.app.data.persistent.database.AniDatabase
 import me.him188.ani.app.data.persistent.database.MIGRATION_19_20
 import me.him188.ani.app.data.persistent.database.createDatabaseBuilder
 import me.him188.ani.app.data.repository.episode.EpisodeCollectionRepository
+import me.him188.ani.app.data.repository.episode.EpisodeSubjectRepository
 import me.him188.ani.app.data.repository.episode.EpisodeCollectionSyncer
 import me.him188.ani.app.data.repository.media.MediaSourceSaves
 import me.him188.ani.app.data.repository.media.MediaSourceSubscriptionRepository
@@ -61,6 +65,12 @@ import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.SettingsRepository
 import me.him188.ani.app.data.repository.user.UserRepository
 import me.him188.ani.app.domain.danmaku.DanmakuBatchCacheManager
+import me.him188.ani.app.domain.torrent.TorrentEngineType
+import me.him188.ani.app.domain.torrent.engines.PikPakEngine
+import me.him188.ani.app.domain.featureflag.FeatureFlagManager
+import me.him188.ani.torrent.pikpak.PikPakCredentials
+import me.him188.ani.torrent.pikpak.PikPakSessionStoreAdapter
+import me.him188.ani.utils.io.inSystem
 import me.him188.ani.app.domain.foundation.AniInstallIdFeatureHandler
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeature
 import me.him188.ani.app.domain.foundation.ConvertSendCountExceedExceptionFeatureHandler
@@ -115,6 +125,8 @@ import me.him188.ani.app.domain.mediasource.web.captcha.CaptchaBrowserFactory
 import me.him188.ani.app.domain.mediasource.web.captcha.ImageCaptchaRecognizer
 import me.him188.ani.app.domain.mediasource.web.captcha.MacCmsImageCaptchaSolver
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSessionManager
+import me.him188.ani.app.domain.notification.NotificationBadgeManager
+import me.him188.ani.app.domain.notification.NotificationBadgeManagerImpl
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceCookieJar
 import me.him188.ani.app.domain.mediasource.web.captcha.WebSourceIdentityRegistry
 import me.him188.ani.app.domain.session.AniSessionRefresher
@@ -300,11 +312,23 @@ private fun KoinApplication.otherModules(
         )
     }
     single<EpisodeService> { EpisodeServiceImpl(aniApiProvider.subjectApi) }
+    single { EpisodeSubjectRepository(aniApiProvider.episodesApi) }
 
     single<BangumiRelatedPeopleService> { BangumiRelatedPeopleService(get<AniApiProvider>().subjectApi) }
     single<BangumiCommentService> { BangumiBangumiCommentServiceImpl(get<AniApiProvider>().subjectApi) }
     single<AniEpisodeCommentService> { AniEpisodeCommentService(get<AniApiProvider>().episodesApi) }
     single<AniCommentReportService> { AniCommentReportService(get<AniApiProvider>().commentsApi) }
+    single<AniNotificationService> { AniNotificationService(aniApiProvider.notificationsApi) }
+    single<AniAnnouncementService> { AniAnnouncementService(aniApiProvider.announcementsApi) }
+    single<AniFeatureFlagService> { AniFeatureFlagService(aniApiProvider.featureFlagsApi) }
+    single<NotificationBadgeManager>(createdAtStart = true) {
+        NotificationBadgeManagerImpl(
+            notificationService = get(),
+            sessionStateProvider = get(),
+            scope = coroutineScope,
+            notificationSettings = get<SettingsRepository>().notificationSettings.flow,
+        ).also { it.start() }
+    }
     single<AniPersonCommentService> {
         AniPersonCommentService(
             personsApi = get<AniApiProvider>().personsApi,
@@ -332,6 +356,16 @@ private fun KoinApplication.otherModules(
             store = getContext().dataStores.installInfoStore,
             playHistoryRepository = get(),
             api = aniApiProvider.userProfileApi,
+            sessionStateProvider = get(),
+            currentUserId = get<UserRepository>().selfInfoFlow.map { it?.id?.toString() },
+            scope = coroutineScope,
+        ).also { it.start() }
+    }
+    // 功能开关: 先用上次的快照, 登录状态确定后拉取, 身份变化时再拉取 (见 docs/contributing/code/feature-flags.md)
+    single(createdAtStart = true) {
+        FeatureFlagManager(
+            store = getContext().dataStores.featureFlagStore,
+            service = get(),
             sessionStateProvider = get(),
             currentUserId = get<UserRepository>().selfInfoFlow.map { it?.id?.toString() },
             scope = coroutineScope,

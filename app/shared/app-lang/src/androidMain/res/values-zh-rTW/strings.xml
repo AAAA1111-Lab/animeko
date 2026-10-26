@@ -88,6 +88,23 @@
     <string name="settings_debug_dev_builds">CI 建置</string>
     <string name="settings_debug_dev_builds_install_commit">安裝指定 commit、PR 或安裝包</string>
     <string name="settings_debug_dev_builds_install_commit_description">列出 main 分支最近的 commits 及其 CI 建置狀態，也可貼上 commit、PR、artifact 連結或安裝包網址，下載 CI 為目前平台建置的安裝包並安裝</string>
+
+    <string name="settings_debug_play_flow">播放流程</string>
+    <string name="settings_debug_play_flow_open">開啟播放流程懸浮窗</string>
+    <string name="settings_debug_play_flow_open_description">懸浮窗即時顯示播放載入的每一步，並保留本次執行內最近的播放工作階段供回看</string>
+    <string name="play_flow_debug_title">播放流程</string>
+    <string name="play_flow_debug_tab_live">即時</string>
+    <string name="play_flow_debug_tab_history">歷史</string>
+    <string name="play_flow_debug_empty">還沒有播放工作階段</string>
+    <string name="play_flow_debug_follow">跳到最新</string>
+    <string name="play_flow_debug_close">關閉</string>
+    <string name="play_flow_debug_back">返回</string>
+    <string name="play_flow_debug_session_summary">條目 %1$d · %2$d 筆事件</string>
+    <string name="play_flow_debug_attempt">第 %1$d 次嘗試 · 劇集 %2$d</string>
+
+    <string name="play_flow_debug_minimize">最小化</string>
+    <string name="play_flow_debug_restore">展開播放流程懸浮窗</string>
+    <string name="play_flow_debug_copy">複製為 JSON</string>
     <string name="settings_debug_dev_builds_unsupported_platform">CI 沒有為目前平台產生可安裝的安裝包</string>
     <string name="settings_debug_dev_builds_token">GitHub Token</string>
     <string name="settings_debug_dev_builds_token_description">下載 GitHub Actions 產物需要 token。Fine-grained token 需要 Actions 讀取權限，classic token 需要 public_repo 範圍。查詢列表不需要 token，但有速率限制。</string>
@@ -118,7 +135,8 @@
     <string name="settings_debug_dev_builds_download">下載</string>
     <string name="settings_debug_dev_builds_cancel">取消</string>
     <string name="settings_debug_dev_builds_downloading">下載中 %1$s / %2$s</string>
-    <string name="settings_debug_dev_builds_extracting">正在解壓縮安裝包…</string>
+    <string name="settings_debug_dev_builds_downloading_incrementally">增量下載中 %1$s / %2$s</string>
+    <string name="settings_debug_dev_builds_comparing_installed">正在比對已安裝的檔案…</string>
     <string name="settings_debug_dev_builds_installing">正在安裝…</string>
     <string name="settings_debug_dev_builds_confirm_title">安裝這個 commit？</string>
     <string name="settings_debug_dev_builds_confirm_message_desktop">將下載 %1$s（%2$s）。隨後 Ani 會退出，用它覆蓋目前版本後自動重啟。設定和資料不受影響。</string>
@@ -127,7 +145,6 @@
     <string name="settings_debug_dev_builds_confirm_install">下載並安裝</string>
     <string name="settings_debug_dev_builds_confirm_download">下載</string>
     <string name="settings_debug_dev_builds_failure_token_required">請先填寫 GitHub Token。下載 GitHub Actions 產物需要登入</string>
-    <string name="settings_debug_dev_builds_failure_package_not_found">產物中沒有 .%1$s 安裝包</string>
     <string name="settings_debug_dev_builds_manual_title">安裝包已下載</string>
     <string name="settings_debug_dev_builds_manual_message">已儲存到 %1$s。請用它取代目前的 AppImage 並重新啟動。</string>
     <string name="settings_debug_dev_builds_manual_reveal">開啟所在位置</string>
@@ -1593,6 +1610,12 @@
     <string name="subject_episode_video_settings_enable_regex_filter">啟用正則彈幕過濾器</string>
     <string name="subject_episode_video_settings_manage_regex_filter">管理正則彈幕過濾器</string>
     <string name="subject_episode_video_settings_debug_mode">彈幕除錯模式</string>
+    <string name="subject_episode_video_settings_text_conversion">彈幕文字</string>
+    <string name="subject_episode_video_settings_text_conversion_original">原樣</string>
+    <string name="subject_episode_video_settings_text_conversion_simplified">簡體</string>
+    <string name="subject_episode_video_settings_text_conversion_traditional">繁體</string>
+    <string name="subject_episode_video_settings_text_conversion_taiwan">台繁</string>
+    <string name="subject_episode_video_settings_text_conversion_hong_kong">港繁</string>
 
     <!-- 人物/角色詳情頁 -->
     <string name="person_details_basic_info">基本資訊</string>
@@ -1779,6 +1802,14 @@
     <string name="qr_login_done">完成</string>
     <string name="qr_login_close">關閉</string>
     <string name="subject_episode_danmaku_sources_title">來源與時間校準</string>
+    <string name="subject_episode_danmaku_text_conversion_item">簡繁轉換</string>
+    <string name="subject_episode_danmaku_text_conversion_desc">個別來源可以覆蓋全部來源的設定</string>
+    <string name="subject_episode_danmaku_text_conversion_preview_hint">範例：</string>
+    <string name="subject_episode_danmaku_text_conversion_override_count">%1$d 個來源已個別設定</string>
+    <string name="subject_episode_danmaku_text_conversion_follow_global">跟隨全域</string>
+    <string name="subject_episode_danmaku_text_conversion_section_all">全部來源</string>
+    <string name="subject_episode_danmaku_text_conversion_section_per_source">個別來源</string>
+    <string name="subject_episode_danmaku_text_conversion_reset_overrides">重設個別設定</string>
     <string name="subject_episode_danmaku_sources_empty">暫無可用彈幕來源</string>
     <string name="video_player_screenshot">截圖</string>
     <string name="video_player_screenshot_share">分享</string>
@@ -1791,6 +1822,84 @@
     <string name="video_player_screenshot_failed_no_frame">截圖失敗: 目前沒有可擷取的畫面</string>
     <string name="video_player_screenshot_failed_save">截圖儲存失敗</string>
     <string name="video_player_screenshot_failed_save_reason">截圖儲存失敗: %1$s</string>
+    <string name="settings_mediasource_jsonapi_section_api">介面</string>
+    <string name="settings_mediasource_jsonapi_base_url">介面網址前綴</string>
+    <string name="settings_mediasource_jsonapi_base_url_supporting">各步驟的相對請求網址以它為基準，例如 https://api.example.com</string>
+    <string name="settings_mediasource_jsonapi_headers">公共請求頭</string>
+    <string name="settings_mediasource_jsonapi_headers_supporting">每行一個，格式為 名稱: 值。每個請求都會帶上，例如 apikey 與 Authorization</string>
+    <string name="settings_mediasource_jsonapi_request_interval">請求間隔（毫秒）</string>
+    <string name="settings_mediasource_jsonapi_request_interval_supporting">任意兩個請求之間的最小間隔，搜尋、劇集與播放步驟共用</string>
+    <string name="settings_mediasource_jsonapi_request_url">請求網址</string>
+    <string name="settings_mediasource_jsonapi_request_url_supporting">可以是相對於介面網址前綴的路徑。可用變數：%1$s</string>
+    <string name="settings_mediasource_jsonapi_request_method">請求方法</string>
+    <string name="settings_mediasource_jsonapi_request_headers">請求頭（可選）</string>
+    <string name="settings_mediasource_jsonapi_request_headers_supporting">每行一個，覆蓋同名的公共請求頭</string>
+    <string name="settings_mediasource_jsonapi_request_body">請求體</string>
+    <string name="settings_mediasource_jsonapi_request_body_supporting">按 JSON 傳送，代入變數後必須是合法 JSON。字串裡的變數會自動轉義。可用變數：%1$s</string>
+    <string name="settings_mediasource_jsonapi_page_size">每頁數量</string>
+    <string name="settings_mediasource_jsonapi_page_size_supporting">代入 {pageSize}</string>
+    <string name="settings_mediasource_jsonapi_select_items">提取條目列表</string>
+    <string name="settings_mediasource_jsonapi_select_items_supporting">JSONPath 運算式。期望回傳一個陣列，每個元素是一個條目；下面的運算式相對於單個條目</string>
+    <string name="settings_mediasource_jsonapi_select_name">提取條目名稱</string>
+    <string name="settings_mediasource_jsonapi_select_name_supporting">JSONPath 運算式，相對於單個條目</string>
+    <string name="settings_mediasource_jsonapi_select_id">提取條目 ID</string>
+    <string name="settings_mediasource_jsonapi_select_id_supporting">JSONPath 運算式，相對於單個條目。作為後續請求裡的 {id}</string>
+    <string name="settings_mediasource_jsonapi_select_aliases">提取別名（可選）</string>
+    <string name="settings_mediasource_jsonapi_select_aliases_supporting">JSONPath 運算式，相對於單個條目，可以是字串陣列。自動匹配時條目名或任一別名對上即可</string>
+    <string name="settings_mediasource_jsonapi_subject_url_template">條目頁面網址模板</string>
+    <string name="settings_mediasource_jsonapi_subject_url_template_supporting">必須包含 {id}。用於開啟站點頁面與識別條目</string>
+    <string name="settings_mediasource_jsonapi_channel_format_declared">宣告線路</string>
+    <string name="settings_mediasource_jsonapi_channel_format_grouped">回應分組</string>
+    <string name="settings_mediasource_jsonapi_channel_format_no_channel">無線路</string>
+    <string name="settings_mediasource_jsonapi_declared_channels">線路列表</string>
+    <string name="settings_mediasource_jsonapi_declared_channels_supporting">每行一條線路，格式為 名稱=匹配值。匹配值用於在播放回應裡選擇候選，省略時與名稱相同。每條線路都列出全部劇集</string>
+    <string name="settings_mediasource_jsonapi_grouped_select_channels">提取線路列表</string>
+    <string name="settings_mediasource_jsonapi_grouped_select_channels_supporting">JSONPath 運算式。期望回傳一個陣列，每個元素是一條線路；劇集列表運算式相對於單條線路</string>
+    <string name="settings_mediasource_jsonapi_grouped_select_channel_name">提取線路名稱</string>
+    <string name="settings_mediasource_jsonapi_grouped_select_channel_name_supporting">JSONPath 運算式，相對於單條線路。同時作為播放回應裡的匹配值</string>
+    <string name="settings_mediasource_jsonapi_select_episodes">提取劇集列表</string>
+    <string name="settings_mediasource_jsonapi_select_episodes_supporting">JSONPath 運算式。期望回傳一個陣列，每個元素是一集；下面的運算式相對於單集</string>
+    <string name="settings_mediasource_jsonapi_episode_select_name">提取劇集名稱</string>
+    <string name="settings_mediasource_jsonapi_episode_select_id">提取劇集 ID</string>
+    <string name="settings_mediasource_jsonapi_episode_select_id_supporting">JSONPath 運算式，相對於單集。作為播放請求裡的 {id}</string>
+    <string name="settings_mediasource_jsonapi_episode_select_sort">提取集號（可選）</string>
+    <string name="settings_mediasource_jsonapi_episode_select_sort_supporting">JSONPath 運算式。為空時按下面的正則從名稱解析集號</string>
+    <string name="settings_mediasource_jsonapi_episode_select_type">提取劇集類型（可選）</string>
+    <string name="settings_mediasource_jsonapi_episode_select_type_supporting">JSONPath 運算式。配合類型映射區分正片與特別篇</string>
+    <string name="settings_mediasource_jsonapi_episode_type_mapping">劇集類型映射</string>
+    <string name="settings_mediasource_jsonapi_episode_type_mapping_supporting">每行一條，格式為 站點值=類型。類型可為 MainStory、SP、OP、ED、PV、MAD、OVA、OAD</string>
+    <string name="settings_mediasource_jsonapi_episode_name_template">劇集顯示名稱模板</string>
+    <string name="settings_mediasource_jsonapi_episode_name_template_supporting">可用變數：{sort}、{name}、{id}</string>
+    <string name="settings_mediasource_jsonapi_episode_url_template">劇集頁面網址模板</string>
+    <string name="settings_mediasource_jsonapi_episode_url_template_supporting">必須包含 {id}，也可用 {subjectId}。用於開啟站點頁面與識別劇集</string>
+    <string name="settings_mediasource_jsonapi_episode_select_video_url">提取影片網址（可選）</string>
+    <string name="settings_mediasource_jsonapi_episode_select_video_url_supporting">JSONPath 運算式，相對於單個劇集。填寫後直接播放列表裡的網址，播放步驟的請求可留空</string>
+    <string name="settings_mediasource_jsonapi_select_candidates">提取候選列表（可選）</string>
+    <string name="settings_mediasource_jsonapi_select_candidates_supporting">JSONPath 運算式。期望回傳一個陣列，每個元素是一個影片候選。為空時直接從回應根提取影片網址</string>
+    <string name="settings_mediasource_jsonapi_select_candidate_channel">提取候選的線路匹配值</string>
+    <string name="settings_mediasource_jsonapi_select_candidate_channel_supporting">JSONPath 運算式，相對於單個候選。與資源所在線路的匹配值比較</string>
+    <string name="settings_mediasource_jsonapi_select_video_url">提取影片網址</string>
+    <string name="settings_mediasource_jsonapi_select_video_url_supporting">JSONPath 運算式，相對於單個候選（或回應根）</string>
+    <string name="settings_mediasource_jsonapi_fallback_to_first_candidate">線路不匹配時使用第一個候選</string>
+    <string name="settings_mediasource_jsonapi_fallback_to_first_candidate_supporting">關閉時，所在線路沒有候選的資源無法播放，播放器會嘗試其他線路</string>
+    <string name="settings_mediasource_jsonapi_step3">步驟 3：播放網址</string>
+    <string name="settings_mediasource_jsonapi_play_request">請求</string>
+    <string name="settings_mediasource_jsonapi_play_response">回應</string>
+    <string name="settings_mediasource_jsonapi_play_status">狀態 %1$d</string>
+    <string name="settings_mediasource_jsonapi_play_candidates">%1$d 個候選</string>
+    <string name="settings_mediasource_jsonapi_play_selected">已選</string>
+    <string name="settings_mediasource_jsonapi_play_fallback">該線路沒有候選，改用了第一個候選</string>
+    <string name="settings_mediasource_jsonapi_play_no_candidate">沒有與線路匹配的候選</string>
+    <string name="settings_mediasource_jsonapi_play_not_found">站點回傳 404</string>
+    <string name="settings_mediasource_jsonapi_play_not_json">回應不是 JSON，或播放步驟配置無效</string>
+    <string name="settings_mediasource_jsonapi_play_request_optional_hint">劇集列表已提供影片網址，此處請求可留空；填寫後只對列表裡沒有網址的劇集發送</string>
+    <string name="settings_mediasource_jsonapi_play_from_episode_list">網址來自劇集列表，未發播放請求</string>
+    <string name="settings_mediasource_jsonapi_play_episode_list_no_video">劇集列表裡沒有這一集的影片網址，播放步驟也沒有設定請求</string>
+    <string name="settings_mediasource_jsonapi_video_headers">影片請求頭</string>
+    <string name="settings_mediasource_jsonapi_video_headers_supporting">每行一個 名稱: 值，只隨影片請求傳送，不發給介面；與 Referer 欄位同名時以這裡為準。可用變數：%1$s</string>
+    <string name="settings_mediasource_jsonapi_unknown_variables">未知變數：%1$s</string>
+    <string name="settings_mediasource_jsonapi_play_open_video">開啟影片網址</string>
+    <string name="settings_mediasource_jsonapi_play_copy">複製</string>
 </resources>
 
 <!--@formatter:on-->

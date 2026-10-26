@@ -9,9 +9,7 @@
 
 package me.him188.ani.app.domain.media.selector
 
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import me.him188.ani.app.domain.media.fetch.MediaFetchSession
 import me.him188.ani.app.domain.mediasource.GetMediaSelectorSourceTiersUseCase
 import me.him188.ani.app.domain.mediasource.GetPreferredWebMediaSourceUseCase
@@ -24,7 +22,10 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 interface MediaSelectorAutoSelectUseCase : UseCase {
-    suspend operator fun invoke(session: MediaFetchSession, mediaSelector: MediaSelector)
+    /**
+     * @return 这次自动选择的结果.
+     */
+    suspend operator fun invoke(session: MediaFetchSession, mediaSelector: MediaSelector): MediaAutoSelectOutcome
 }
 
 class MediaSelectorAutoSelectUseCaseImpl(
@@ -34,31 +35,29 @@ class MediaSelectorAutoSelectUseCaseImpl(
     private val getMediaSelectorSourceTiers: GetMediaSelectorSourceTiersUseCase by inject()
     private val getPreferredWebMediaSource: GetPreferredWebMediaSourceUseCase by inject()
 
-    override suspend fun invoke(session: MediaFetchSession, mediaSelector: MediaSelector) {
-        coroutineScope {
-            val settings = getMediaSelectorSettingsFlow().first()
-            // #355 Restore a temporarily enabled source using the merged media preference.
-            launch {
-                if (settings.autoEnableLastSelected) {
-                    val sourceId = mediaSelector.mediaSourceId.finalSelected.first()
-                    session.mediaSourceResults.firstOrNull { it.mediaSourceId == sourceId }?.enable()
-                }
-            }
-
-            val subjectId = session.request.first().subjectId.toIntOrNull()
-            MediaAutoSelector(mediaSelector).select(
-                session,
-                MediaAutoSelector.Config(
-                    preferredSourceId = subjectId?.let { getPreferredWebMediaSource(it).first() },
-                    web = if (settings.preferKind == MediaSourceKind.WEB) MediaAutoSelector.Web(
-                        sourceTiers = getMediaSelectorSourceTiers().first(),
-                        fastSelect = settings.fastSelectWebKind,
-                        exactMatchAfter = settings.fastSelectWebLowTierToleranceDuration,
-                    ) else null,
-                    fallbackToOtherKinds = true,
-                ),
-            )
+    override suspend fun invoke(session: MediaFetchSession, mediaSelector: MediaSelector): MediaAutoSelectOutcome {
+        val settings = getMediaSelectorSettingsFlow().first()
+        // #355 Restore a temporarily enabled source using the merged media preference.
+        // Enable it before selecting: a disabled source counts as finished, and once every Web source has finished
+        // the selector stops waiting for deadlines. The selector needs the same preference before deciding anyway.
+        if (settings.autoEnableLastSelected) {
+            val sourceId = mediaSelector.mediaSourceId.finalSelected.first()
+            session.mediaSourceResults.firstOrNull { it.mediaSourceId == sourceId }?.enable()
         }
+
+        val subjectId = session.request.first().subjectId.toIntOrNull()
+        return MediaAutoSelector(mediaSelector).select(
+            session,
+            MediaAutoSelector.Config(
+                preferredSourceId = subjectId?.let { getPreferredWebMediaSource(it).first() },
+                web = if (settings.preferKind == MediaSourceKind.WEB) MediaAutoSelector.Web(
+                    sourceTiers = getMediaSelectorSourceTiers().first(),
+                    fastSelect = settings.fastSelectWebKind,
+                    exactMatchAfter = settings.fastSelectWebLowTierToleranceDuration,
+                ) else null,
+                fallbackToOtherKinds = true,
+            ),
+        )
     }
 
     override fun getKoin(): Koin = koin

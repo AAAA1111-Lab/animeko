@@ -37,6 +37,7 @@ import me.him188.ani.app.domain.media.hls.HlsPlaybackPreparer
 import me.him188.ani.app.domain.media.hls.PlatformHlsPlaybackPreparer
 import me.him188.ani.app.domain.media.resolver.AndroidLocalFileMediaResolver
 import me.him188.ani.app.domain.media.resolver.AndroidWebMediaResolver
+import me.him188.ani.app.domain.media.resolver.ApiVideoMediaResolver
 import me.him188.ani.app.domain.media.resolver.HttpStreamingMediaResolver
 import me.him188.ani.app.domain.media.resolver.MediaResolver
 import me.him188.ani.app.domain.mediasource.web.AndroidOnnxImageCaptchaRecognizer
@@ -179,6 +180,7 @@ fun getAndroidModules(
             torrentMediaResolvers(get<TorrentManager>().engines, get())
                 .plus(AndroidLocalFileMediaResolver())
                 .plus(HttpStreamingMediaResolver())
+                .plus(ApiVideoMediaResolver(get<MediaSourceManager>().apiVideoResolverLoader))
                 .plus(
                     AndroidWebMediaResolver(
                         get<MediaSourceManager>().webVideoMatcherLoader,

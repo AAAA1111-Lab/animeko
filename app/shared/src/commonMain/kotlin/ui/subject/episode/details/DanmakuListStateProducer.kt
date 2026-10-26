@@ -13,12 +13,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import me.him188.ani.app.domain.danmaku.DanmakuTextConversionSettings
 import me.him188.ani.app.domain.episode.DanmakuFetchResultWithConfig
 import me.him188.ani.app.ui.episode.danmaku.DanmakuSourceItem
 import me.him188.ani.danmaku.api.DanmakuServiceId
 import me.him188.ani.danmaku.api.provider.DanmakuMatchMethod
 import me.him188.ani.danmaku.api.provider.DanmakuProviderId
 import me.him188.ani.danmaku.ui.DanmakuPresentation
+import me.him188.ani.danmaku.ui.DanmakuTextConversion
 import me.him188.ani.utils.platform.Uuid
 
 /**
@@ -58,6 +60,14 @@ data class DanmakuListState(
     val isLoading: Boolean,
     val isEmpty: Boolean,
     val cacheStatus: DanmakuCacheStatus = DanmakuCacheStatus.None,
+    /**
+     * 全局弹幕文字转换设置, 用于展示各来源的跟随值.
+     */
+    val globalTextConversion: DanmakuTextConversion = DanmakuTextConversion.ORIGINAL,
+    /**
+     * 按来源的弹幕文字转换覆盖, 用于打开统一设置对话框.
+     */
+    val textConversionOverrides: Map<DanmakuServiceId, DanmakuTextConversion> = emptyMap(),
 ) {
     companion object {
         val Loading = DanmakuListState(
@@ -79,12 +89,14 @@ class DanmakuListStateProducer(
      * 当前集在本地缓存中的弹幕条数.
      */
     cachedCountFlow: Flow<Int> = flowOf(0),
+    textConversion: Flow<DanmakuTextConversionSettings> = flowOf(DanmakuTextConversionSettings.Default),
 ) {
     val stateFlow: Flow<DanmakuListState> = combine(
         danmakuFlow,
         fetchResultsFlow,
         cachedCountFlow,
-    ) { danmakuList, fetchResults, cachedCount ->
+        textConversion,
+    ) { danmakuList, fetchResults, cachedCount, textConversionState ->
         val sourceItems = fetchResults.map { result ->
             DanmakuSourceItem(
                 serviceId = result.serviceId,
@@ -92,6 +104,7 @@ class DanmakuListStateProducer(
                 matchMethod = result.matchInfo.method,
                 shiftMillis = result.config.shiftMillis,
                 count = danmakuList.count { presentation -> presentation.danmaku.serviceId == result.serviceId },
+                textConversionOverride = textConversionState.overrides[result.serviceId],
             )
         }
 
@@ -119,6 +132,8 @@ class DanmakuListStateProducer(
                     .filter { it.providerId != DanmakuProviderId.Local }
                     .sumOf { it.matchInfo.count },
             ),
+            globalTextConversion = textConversionState.global,
+            textConversionOverrides = textConversionState.overrides,
         )
     }.distinctUntilChanged()
 

@@ -107,6 +107,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -160,6 +161,7 @@ dependencies {
 
     implementation(libs.ktor.client.core)
     implementation(libs.mediamp.ffmpeg)
+    implementation(libs.sokkuri.runtime) // AniApplication / TvAniApplication 初始化弹幕简繁转换
 }
 
 idea {
