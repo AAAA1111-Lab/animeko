@@ -12,15 +12,15 @@ name: Build datasource-test-mcp
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-  pull_request:
-    paths:
-      - 'tools/datasource-test-mcp/**'
-      - '.github/workflows/datasource-test-mcp.yml'
+#  push:
+#    branches:
+#      - main
+#    paths-ignore:
+#      - '**/*.md'
+#  pull_request:
+#    paths:
+#      - 'tools/datasource-test-mcp/**'
+#      - '.github/workflows/datasource-test-mcp.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
